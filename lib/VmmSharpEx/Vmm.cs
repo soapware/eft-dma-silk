@@ -98,7 +98,18 @@ public sealed partial class Vmm : IDisposable
         };
         if (hVMM.ToInt64() == 0)
         {
-            throw new VmmException("VMM INIT FAILED.");
+            string detail = "";
+            if (pLcErrorInfo != IntPtr.Zero)
+            {
+                try
+                {
+                    var e2 = Marshal.PtrToStructure<Lci.LC_CONFIG_ERRORINFO>(pLcErrorInfo);
+                    if (e2.cwszUserText > 0)
+                        detail = " — " + Marshal.PtrToStringUni(checked((IntPtr)(vaLcCreateErrorInfo + cbERROR_INFO)));
+                }
+                catch { }
+            }
+            throw new VmmException($"VMM INIT FAILED{detail}.");
         }
 
         if (vaLcCreateErrorInfo == 0)

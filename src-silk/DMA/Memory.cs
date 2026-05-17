@@ -189,10 +189,10 @@ namespace eft_dma_radar.Silk.DMA
         {
             Log.WriteLine("[Memory] Initializing DMA...");
 
-            var vmmVer = FileVersionInfo.GetVersionInfo("vmm.dll").FileVersion;
-            var lcVer = FileVersionInfo.GetVersionInfo("leechcore.dll").FileVersion;
+            var vmmVer = FileVersionInfo.GetVersionInfo(Path.Combine(AppContext.BaseDirectory, "vmm.dll")).FileVersion;
+            var lcVer = FileVersionInfo.GetVersionInfo(Path.Combine(AppContext.BaseDirectory, "leechcore.dll")).FileVersion;
 
-            var args = new List<string>(["-norefresh", "-device", config.DeviceStr, "-waitinitialize"]);
+            var args = new List<string>(["-printf", "-v", "-device", config.DeviceStr, "-waitinitialize"]);
 
             try
             {
@@ -207,7 +207,29 @@ namespace eft_dma_radar.Silk.DMA
                 if (config.MemMapEnabled)
                     args.AddRange(["-memmap", MemMapFile]);
 
-                _vmm = new Vmm([.. args]);
+                // Retry indefinitely — FT601 USB may need a physical replug or
+                // time to recover after a prior process was force-killed.
+                // The radar will connect as soon as the device becomes available.
+                int attempt = 0;
+                while (true)
+                {
+                    attempt++;
+                    try
+                    {
+                        _vmm = new Vmm([.. args]);
+                        Log.WriteLine($"[Memory] VMM connected on attempt {attempt}.");
+                        break;
+                    }
+                    catch (VmmSharpEx.VmmException ex)
+                    {
+                        if (attempt == 1)
+                            Log.WriteLine("[Memory] VMM init failed. If this persists, unplug and replug the USB cable from the DMA card.");
+                        if (attempt % 4 == 0)
+                            Log.WriteLine($"[Memory] Still waiting for DMA device... (attempt {attempt}) — replug USB cable if stuck.");
+                        Log.WriteLine($"[Memory] VMM attempt {attempt} failed ({ex.Message}), retrying in 8s...");
+                        Thread.Sleep(8000);
+                    }
+                }
 
                 // Benchmark BEFORE registering auto-refresh so the PCIe bus is idle
                 // during measurement. RegisterAutoRefresh drives continuous TLP traffic

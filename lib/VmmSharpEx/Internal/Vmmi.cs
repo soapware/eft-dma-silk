@@ -913,8 +913,10 @@ internal static partial class Vmmi
 
     #region Imports
 
-    [LibraryImport("vmm.dll", EntryPoint = "VMMDLL_InitializeEx")]
-    public static partial IntPtr VMMDLL_InitializeEx(
+    // Use DllImport (not LibraryImport) — source-generated LibraryImport does not reliably
+    // marshal string[] with LPArray/LPStr. DllImport's legacy interop layer handles it correctly.
+    [DllImport("vmm.dll", EntryPoint = "VMMDLL_InitializeEx", CallingConvention = CallingConvention.Cdecl)]
+    public static extern IntPtr VMMDLL_InitializeEx(
         int argc,
         [MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.LPStr)] [In]
         string[] argv,

@@ -274,6 +274,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     var gameWorld = FindGameWorld();
                     if (gameWorld == 0)
                     {
+                        Log.WriteRateLimited(AppLogLevel.Info, "gw_zero", TimeSpan.FromSeconds(10),
+                            "[LocalGameWorld] GameWorld not found yet — waiting for raid...");
                         Thread.Sleep(500);
                         continue;
                     }
@@ -281,7 +283,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     // Reject stale GameWorld from a previous raid (Unity keeps it alive on stats/loading screen)
                     if (gameWorld == Interlocked.Read(ref _lastDisposedBase))
                     {
-                        Log.WriteRateLimited(AppLogLevel.Debug, "gw_stale", TimeSpan.FromSeconds(10),
+                        Log.WriteRateLimited(AppLogLevel.Info, "gw_stale", TimeSpan.FromSeconds(10),
                             $"[LocalGameWorld] Stale GameWorld @ 0x{gameWorld:X} — waiting for new raid...");
                         Thread.Sleep(1000);
                         continue;
@@ -303,32 +305,27 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     // Validate BEFORE constructing the instance (which spawns workers).
                     if (!IsLocalPlayerInRaid(gameWorld))
                     {
-                        Log.WriteRateLimited(AppLogLevel.Debug, "gw_noraid", TimeSpan.FromSeconds(5),
-                            "[LocalGameWorld] GameWorld found but player data not ready — waiting...");
+                        Log.WriteRateLimited(AppLogLevel.Info, "gw_noraid", TimeSpan.FromSeconds(5),
+                            "[LocalGameWorld] GameWorld found but player list not ready — waiting...");
                         Thread.Sleep(500);
                         continue;
                     }
 
                     if (!ValidateTransformReadable(mainPlayerPtr))
                     {
-                        Log.WriteRateLimited(AppLogLevel.Debug, "gw_stale_xform", TimeSpan.FromSeconds(5),
-                            $"[LocalGameWorld] GameWorld @ 0x{gameWorld:X} — transform unreadable (stale). Waiting...");
+                        Log.WriteRateLimited(AppLogLevel.Info, "gw_stale_xform", TimeSpan.FromSeconds(5),
+                            $"[LocalGameWorld] GameWorld @ 0x{gameWorld:X} — transform unreadable. Waiting...");
                         Thread.Sleep(1000);
                         continue;
                     }
 
                     // ── Phase 2: Map validation ─────────────────────────────
-                    // The main menu scene contains a valid GameWorld with a NarratePlayer
-                    // that passes all structural checks above, but has no real LocationId
-                    // (reads as "unknown"). Reject GameWorlds whose map is not a known
-                    // raid map or "hideout" — this mirrors the WPF version's
-                    // GameData.MapNames.ContainsKey() guard.
                     var mapId = ReadMapID(gameWorld);
                     if (!mapId.Equals(HideoutMapID, StringComparison.OrdinalIgnoreCase)
                         && !MapManager.IsKnownMap(mapId))
                     {
-                        Log.WriteRateLimited(AppLogLevel.Debug, "gw_unknown_map", TimeSpan.FromSeconds(10),
-                            $"[LocalGameWorld] GameWorld @ 0x{gameWorld:X} has unrecognised map '{mapId}' — not a raid. Waiting...");
+                        Log.WriteRateLimited(AppLogLevel.Info, "gw_unknown_map", TimeSpan.FromSeconds(10),
+                            $"[LocalGameWorld] Map '{mapId}' not in config — not a recognised raid. Waiting...");
                         Thread.Sleep(1000);
                         continue;
                     }

@@ -82,11 +82,13 @@ namespace eft_dma_radar.Silk.UI
         private const  float  WaveSpeed = 0.158f; // fraction/second (0.105 × 1.5)
         private static readonly char[] WavePool =
         [
-            '█','▓','▒','░','▄','▀','▌','▐','▪','▫','▬','■','□',
-            '╬','╪','╫','╤','╧','╦','╩','═','║','╔','╗','╚','╝',
-            '±','×','÷','≈','∞','≡','√','∑','·','•','#','@','%','*','|','~'
+            // Pure ASCII — guaranteed in any monospace font including Cutive Mono
+            '|', '-', '+', '=', '*', '#', '@', '%', '/', '\\',
+            '!', '?', ';', ':', '<', '>', '^', '~', '`', '"',
+            '$', '&', '_', '[', ']', '{', '}', '(', ')', '.'
         ];
-        private const string RussianGhost = "Ожидание начала рейда";
+        // Accented Latin-1 chars — in every Latin font, look suitably alien in ASCII context
+        private const string RussianGhost = "ÁÄÅÆÇÐÊËÌÍÏÑÒÓÖØÙÚÜÝÞßàäåæçðêëìíïñòóöøùúüýþ";
         private static long _wavePauseUntilMs = 0; // ms timestamp until wave resumes after edge pause
         private static readonly HashSet<int> _cyrillicPositions = new(8); // populated by ApplyWave
 

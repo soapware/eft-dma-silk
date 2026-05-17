@@ -48,23 +48,23 @@ namespace eft_dma_radar.Silk.UI.Shell
 
         private static readonly Item[] _items =
         [
-            new Item("P", "Players", "1",
+            new Item("Plyr", "Players", "1",
                 static () => PlayerInfoWidget.IsOpen,
                 static () => PlayerInfoWidget.IsOpen = !PlayerInfoWidget.IsOpen),
 
-            new Item("L", "Loot",    "2",
+            new Item("Loot", "Loot",    "2",
                 static () => LootWidget.IsOpen,
                 static () => LootWidget.IsOpen = !LootWidget.IsOpen),
 
-            new Item("A", "Aimview", "3",
+            new Item("Aim", "Aimview", "3",
                 static () => AimviewWidget.IsOpen,
                 static () => AimviewWidget.IsOpen = !AimviewWidget.IsOpen),
 
-            new Item("Q", "Quests",  "4",
+            new Item("Qsts", "Quests",  "4",
                 static () => QuestPanel.IsOpen,
                 static () => QuestPanel.IsOpen = !QuestPanel.IsOpen),
 
-            new Item("S", "Settings", "5",
+            new Item("Sett", "Settings", "5",
                 static () => SettingsPanel.IsOpen,
                 static () => SettingsPanel.IsOpen = !SettingsPanel.IsOpen),
         ];
@@ -82,31 +82,31 @@ namespace eft_dma_radar.Silk.UI.Shell
         /// </summary>
         private static readonly Item[] _secondaryItems =
         [
-            new Item("F", "Loot Filters", "L",
+            new Item("Filt", "Loot Filters", "L",
                 static () => LootFiltersPanel.IsOpen,
                 static () => LootFiltersPanel.IsOpen = !LootFiltersPanel.IsOpen),
 
-            new Item("K", "Killfeed", "",
+            new Item("Kill", "Killfeed", "",
                 static () => KillfeedPanel.IsOpen,
                 static () => KillfeedPanel.IsOpen = !KillfeedPanel.IsOpen),
 
-            new Item("⌂", "Hideout", "H",
+            new Item("Hide", "Hideout", "H",
                 static () => HideoutPanel.IsOpen,
                 static () => HideoutPanel.IsOpen = !HideoutPanel.IsOpen),
 
-            new Item("⁂", "Quest Planner", "",
+            new Item("QPln", "Quest Planner", "",
                 static () => QuestPlannerPanel.IsOpen,
                 static () => QuestPlannerPanel.IsOpen = !QuestPlannerPanel.IsOpen),
 
-            new Item("◯", "Player History", "",
+            new Item("Hist", "Player History", "",
                 static () => PlayerHistoryPanel.IsOpen,
                 static () => PlayerHistoryPanel.IsOpen = !PlayerHistoryPanel.IsOpen),
 
-            new Item("⚲", "Watchlist", "",
+            new Item("Wtch", "Watchlist", "",
                 static () => PlayerWatchlistPanel.IsOpen,
                 static () => PlayerWatchlistPanel.IsOpen = !PlayerWatchlistPanel.IsOpen),
 
-            new Item("⌨", "Hotkeys", "",
+            new Item("Keys", "Hotkeys", "",
                 static () => HotkeyManagerPanel.IsOpen,
                 static () => HotkeyManagerPanel.IsOpen = !HotkeyManagerPanel.IsOpen),
         ];

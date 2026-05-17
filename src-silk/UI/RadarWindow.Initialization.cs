@@ -32,10 +32,14 @@ namespace eft_dma_radar.Silk.UI
             // Position on the configured monitor. Do NOT set WindowState in options —
             // GLFW ignores Position when Maximized/Fullscreen is set in options.
             var radarMon = MonitorInfo.GetMonitor(Config.RadarTargetScreen);
-            options.Position = new Vector2D<int>(radarMon.Left, radarMon.Top);
+            // Offset 40px from monitor top so the title bar (~30px) is within the monitor.
+            // GLFW positions by client-area top-left; without this offset the title bar
+            // ends up at y = (radarMon.Top - 30) which is above the visible screen.
+            const int TitleBarOffset = 40;
+            options.Position = new Vector2D<int>(radarMon.Left, radarMon.Top + TitleBarOffset);
             options.Size = new Vector2D<int>(
                 Math.Min(Config.WindowWidth,  radarMon.Width),
-                Math.Min(Config.WindowHeight, radarMon.Height));
+                Math.Min(Config.WindowHeight, radarMon.Height - TitleBarOffset));
 
             Log.WriteLine($"[RadarWindow] Creating window on monitor {Config.RadarTargetScreen} ({radarMon.Width}x{radarMon.Height} @ {radarMon.Left},{radarMon.Top})");
 

@@ -642,40 +642,30 @@ namespace eft_dma_radar.Silk.UI
             float W = _window.Size.X / scale;
             float H = _window.Size.Y / scale;
 
-            // ── Typewriter state machine ─────────────────────────────────────
+            // ── Wave ping-pong animation ─────────────────────────────────────
+            string displayText;
             if (animated)
             {
-                if (!string.Equals(message, _typewriterMsg, StringComparison.Ordinal))
-                {
-                    _typewriterMsg = message;
-                    _typewriterLen = 0;
-                    _typewriterSw.Restart();
-                    _cursorSw.Restart();
-                    _cursorVisible = true;
-                }
+                long nowMs = Environment.TickCount64;
+                float dt = _waveLastMs == 0 ? 0f : (nowMs - _waveLastMs) / 1000f;
+                _waveLastMs = nowMs;
 
-                int targetLen = Math.Min(message.Length, (int)(_typewriterSw.ElapsedMilliseconds / 1000f * TypewriterCps));
-                _typewriterLen = Math.Max(_typewriterLen, targetLen);
+                _wavePos += (_waveRight ? WaveSpeed : -WaveSpeed) * dt;
+                if (_wavePos >= 1f) { _wavePos = 1f; _waveRight = false; }
+                if (_wavePos <= 0f) { _wavePos = 0f; _waveRight = true;  }
 
-                if (_cursorSw.ElapsedMilliseconds >= 420)
-                {
-                    _cursorVisible = !_cursorVisible;
-                    _cursorSw.Restart();
-                }
+                // 1-in-40 chance to toggle Russian glitch characters in trail
+                if (_waveRng.Next(40) == 0) _waveRussian = !_waveRussian;
+
+                displayText = ApplyWave(message, _wavePos, _waveRussian);
             }
             else
             {
-                // Static messages: immediately show full text, no cursor
-                _typewriterMsg = message;
-                _typewriterLen = message.Length;
-                _cursorVisible = false;
+                displayText = message;
+                _waveLastMs = 0; // reset so wave starts fresh on next animated call
+                _wavePos    = 0f;
+                _waveRight  = true;
             }
-
-            string revealed = _typewriterLen >= message.Length
-                ? message
-                : message[.._typewriterLen];
-            bool showCursor = animated && _cursorVisible;
-            string displayText = showCursor ? revealed + "█" : revealed;
 
             // ── Scanline sweep (animated states only) ────────────────────────
             if (animated)
@@ -752,6 +742,34 @@ namespace eft_dma_radar.Silk.UI
                 return "[ HIDEOUT MODE ACTIVE ]";
             // Matching stages (queued, matching, loading, etc.)
             return animated ? "[ AWAITING RAID ENTRY ]" : "";
+        }
+
+        /// <summary>
+        /// Applies the wave ping-pong animation to the status text.
+        /// Chars near the crest are replaced with progressively lighter block characters;
+        /// with 1-in-40 probability the trail zone shows Cyrillic glitch text instead.
+        /// </summary>
+        private static string ApplyWave(string text, float pos, bool useRussian)
+        {
+            if (text.Length == 0) return text;
+            var sb = new System.Text.StringBuilder(text);
+            int crest = (int)(pos * (text.Length - 1));
+
+            // Lead zone: 1-2 chars ahead of crest → lightest block
+            for (int i = crest; i < Math.Min(crest + 2, text.Length); i++)
+                sb[i] = '░';
+
+            // Active trail: up to 6 chars behind crest → wave pool or Russian ghost
+            for (int i = Math.Max(0, crest - 6); i < crest; i++)
+            {
+                float d  = (float)(crest - i) / 6f;
+                int   pi = Math.Clamp((int)(d * (WavePool.Length - 1)), 0, WavePool.Length - 1);
+                if (useRussian && i < RussianGhost.Length)
+                    sb[i] = RussianGhost[i];
+                else
+                    sb[i] = WavePool[pi];
+            }
+            return sb.ToString();
         }
 
         /// <summary>

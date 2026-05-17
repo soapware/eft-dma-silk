@@ -72,15 +72,17 @@ namespace eft_dma_radar.Silk.UI
         private static readonly string[] _statusDots = ["", ".", "..", "..."]; // kept for compat
 
         // ── Status banner animation state ────────────────────────────────────
-        // Typewriter: reveals characters progressively, blinking cursor at end.
-        // Scanline:   a bright band sweeps top-to-bottom on a 3-second loop.
-        private static string _typewriterMsg = "";
-        private static int    _typewriterLen;
-        private static readonly Stopwatch _typewriterSw = Stopwatch.StartNew();
-        private static readonly Stopwatch _cursorSw     = Stopwatch.StartNew();
-        private static bool   _cursorVisible = true;
-        // chars per second for typewriter reveal
-        private const  float  TypewriterCps = 28f;
+        // Wave ping-pong: a crest sweeps left→right→left replacing chars with
+        // block chars. Scanline sweeps top→bottom behind it.
+        private static float _wavePos    = 0f;    // 0..1 fraction along text
+        private static bool  _waveRight  = true;  // sweep direction
+        private static long  _waveLastMs = 0;
+        private static bool  _waveRussian = false;
+        private static readonly Random _waveRng = new();
+        private const  float  WaveSpeed = 0.42f;  // fraction/second (full cycle ~4.8s)
+        private static readonly char[] WavePool =
+            ['█', '▓', '▒', '░', '▄', '▀', '▌', '▐', '█', '▓', '▒', '░', '▄', '▀'];
+        private const string RussianGhost = "Ожидание начала рейда";
         // scanline period in ms
         private const  long   ScanlinePeriodMs = 3000;
 

@@ -236,7 +236,7 @@ namespace eft_dma_radar.Silk.Config
         /// When false (default), the aimview uses a synthetic camera built from
         /// the local player's position + rotation.
         /// </summary>
-        public bool UseAdvancedAimview { get; set; } = false;
+        public bool UseAdvancedAimview { get; set; } = true;
 
         /// <summary>Game monitor width (pixels) — used by CameraManager for W2S viewport math.</summary>
         public int GameMonitorWidth { get; set; } = 2560;
@@ -327,7 +327,7 @@ namespace eft_dma_radar.Silk.Config
         public bool ShowPlayerWatchlistPanel { get; set; } = false;
 
         /// <summary>Whether the ESP overlay widget is open.</summary>
-        public bool ShowEspWidget { get; set; } = false;
+        public bool ShowEspWidget { get; set; } = true;
 
         /// <summary>Show player boxes/labels on the ESP overlay.</summary>
         public bool EspShowPlayers { get; set; } = true;

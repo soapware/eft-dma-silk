@@ -144,8 +144,7 @@ namespace eft_dma_radar.Silk.UI
                 PlayerHistoryPanel.IsOpen = Config.ShowPlayerHistoryPanel;
                 PlayerWatchlistPanel.IsOpen = Config.ShowPlayerWatchlistPanel;
 
-                if (Config.ShowEspWidget)
-                    EspWindow.Open();
+                EspWindow.Open(); // always auto-start — single-launch experience
 
                 // Auto-open the hideout panel
                 Memory.HideoutEntered += static (_, _) => HideoutPanel.IsOpen = true;

@@ -60,9 +60,24 @@ namespace eft_dma_radar.Silk
                 Config = SilkConfig.Load();
                 Log.WriteLine("[SilkProgram] Config loaded OK.");
 
+                // -clear-cache: nuke IL2CPP offset cache files to force a live dump on next raid.
+                // Useful after an EFT game update so stale PE-fingerprint caches are discarded.
+                var cliArgs = Environment.GetCommandLineArgs();
+                if (cliArgs?.Contains("-clear-cache", StringComparer.OrdinalIgnoreCase) ?? false)
+                {
+                    var cacheDir = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                        "eft-dma-radar-silk");
+                    foreach (var f in new[] { "il2cpp_offsets_pe.json", "il2cpp_offsets_rva.json" })
+                    {
+                        var path = Path.Combine(cacheDir, f);
+                        if (File.Exists(path)) { File.Delete(path); Log.WriteLine($"[SilkProgram] Deleted cache: {f}"); }
+                    }
+                }
+
                 // Wire debug logging from config or -debug command-line argument
                 Log.EnableDebugLogging = Config.DebugLogging ||
-                    (Environment.GetCommandLineArgs()?.Contains("-debug", StringComparer.OrdinalIgnoreCase) ?? false);
+                    (cliArgs?.Contains("-debug", StringComparer.OrdinalIgnoreCase) ?? false);
                 if (Log.EnableDebugLogging)
                     Log.WriteLine("[SilkProgram] Debug logging enabled.");
 

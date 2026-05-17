@@ -222,14 +222,32 @@ namespace eft_dma_radar.Silk.UI
                 return;
             }
 
-            // F11 — fullscreen toggle, always fires regardless of ImGui focus
+            // F11 — borderless windowed fullscreen on whichever monitor the radar is on
             if (key == Key.F11)
             {
-                bool wantFull = _window.WindowState != WindowState.Fullscreen;
-                _window.WindowState = wantFull ? WindowState.Fullscreen : WindowState.Normal;
-                Config.WindowFullscreen = wantFull;
+                if (_fakeFullscreen)
+                {
+                    _window.WindowBorder = WindowBorder.Resizable;
+                    _window.Size         = _savedFsSize;
+                    _window.Position     = _savedFsPos;
+                    _fakeFullscreen      = false;
+                }
+                else
+                {
+                    _savedFsSize = _window.Size;
+                    _savedFsPos  = _window.Position;
+                    int cx = _window.Position.X + _window.Size.X / 2;
+                    int cy = _window.Position.Y + _window.Size.Y / 2;
+                    var mon = MonitorInfo.GetAllMonitors()
+                        .FirstOrDefault(m => cx >= m.Left && cx < m.Left + m.Width
+                                          && cy >= m.Top  && cy < m.Top  + m.Height)
+                        ?? MonitorInfo.GetMonitor(0);
+                    _window.WindowBorder = WindowBorder.Hidden;
+                    _window.Size         = new Vector2D<int>(mon.Width, mon.Height);
+                    _window.Position     = new Vector2D<int>(mon.Left, mon.Top);
+                    _fakeFullscreen      = true;
+                }
                 Config.MarkDirty();
-                Log.WriteLine($"[RadarWindow] Fullscreen: {wantFull}");
                 return;
             }
 

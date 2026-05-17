@@ -153,9 +153,6 @@ namespace eft_dma_radar.Silk.Config
         /// <summary>Whether the radar window starts maximized.</summary>
         public bool WindowMaximized { get; set; } = false;
 
-        /// <summary>Whether the radar window starts in fullscreen mode.</summary>
-        public bool WindowFullscreen { get; set; } = false;
-
         /// <summary>Monitor index (0-based) for the radar window. 0 = primary. Default 1 = second monitor.</summary>
         public int RadarTargetScreen { get; set; } = 1;
 
@@ -378,6 +375,15 @@ namespace eft_dma_radar.Silk.Config
 
         /// <summary>Target monitor index (0-based) for the ESP window. 0 = primary monitor.</summary>
         public int EspTargetScreen { get; set; } = 0;
+
+        /// <summary>Saved ESP window width (pixels). Default 960.</summary>
+        public int EspWindowWidth  { get; set; } = 960;
+        /// <summary>Saved ESP window height (pixels). Default 540.</summary>
+        public int EspWindowHeight { get; set; } = 540;
+        /// <summary>Saved ESP window X position. -1 = auto-center on target monitor.</summary>
+        public int EspWindowX      { get; set; } = -1;
+        /// <summary>Saved ESP window Y position. -1 = auto-center on target monitor.</summary>
+        public int EspWindowY      { get; set; } = -1;
 
         // ── Hideout
 

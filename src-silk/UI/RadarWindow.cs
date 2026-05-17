@@ -7,6 +7,7 @@ using eft_dma_radar.Silk.Tarkov.GameWorld.Btr;
 using eft_dma_radar.Silk.UI.Panels;
 using ImGuiNET;
 using Silk.NET.Input;
+using Silk.NET.Maths;
 using Silk.NET.OpenGL;
 using Silk.NET.OpenGL.Extensions.ImGui;
 using Silk.NET.Windowing;
@@ -92,6 +93,11 @@ namespace eft_dma_radar.Silk.UI
         // Resource purge rate limiter
         private static long _lastPurgeTick;
         private const long PurgeIntervalMs = 5000;
+
+        // Borderless-windowed fullscreen state (F11 toggle)
+        private static bool _fakeFullscreen;
+        private static Vector2D<int> _savedFsSize;
+        private static Vector2D<int> _savedFsPos;
 
         // Pinned font data for ImGui — must remain alive for the lifetime of the atlas
         private static GCHandle _imguiFontHandle;

@@ -20,10 +20,13 @@ namespace eft_dma_radar.Silk.UI
         private static void OnClosing()
         {
             // Persist window state
-            Config.WindowWidth = _window.Size.X;
-            Config.WindowHeight = _window.Size.Y;
-            Config.WindowMaximized  = _window.WindowState == WindowState.Maximized;
-            Config.WindowFullscreen = _window.WindowState == WindowState.Fullscreen;
+            // Save size/position only when not in fake fullscreen (would persist FS coords)
+            if (!_fakeFullscreen)
+            {
+                Config.WindowWidth     = _window.Size.X;
+                Config.WindowHeight    = _window.Size.Y;
+                Config.WindowMaximized = _window.WindowState == WindowState.Maximized;
+            }
 
             // Persist widget/panel visibility
             Config.ShowPlayersWidget = PlayerInfoWidget.IsOpen;

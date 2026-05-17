@@ -27,20 +27,18 @@ namespace eft_dma_radar.Silk.UI
             options.PreferredStencilBufferBits = 8;
             options.PreferredBitDepth = new Vector4D<int>(8, 8, 8, 8);
 
-            // Position radar on its target monitor (default: monitor 2, index 1)
+            // Position radar on its target monitor (default: monitor 2, index 1).
             // MonitorInfo falls back to primary if the index doesn't exist.
+            // IMPORTANT: Do NOT set WindowState here — GLFW always maximizes/fullscreens
+            // to the primary monitor when WindowState is set in WindowOptions, ignoring
+            // the Position. We open Normal and apply Maximized in OnLoad() instead.
             var radarMon = MonitorInfo.GetMonitor(Config.RadarTargetScreen);
             options.Position = new Vector2D<int>(radarMon.Left, radarMon.Top);
             options.Size = new Vector2D<int>(
                 Math.Min(Config.WindowWidth,  radarMon.Width),
                 Math.Min(Config.WindowHeight, radarMon.Height));
 
-            if (Config.WindowFullscreen)
-                options.WindowState = WindowState.Fullscreen;
-            else if (Config.WindowMaximized)
-                options.WindowState = WindowState.Maximized;
-
-            Log.WriteLine($"[RadarWindow] Creating window on monitor {Config.RadarTargetScreen} ({radarMon.Width}x{radarMon.Height} @ {radarMon.Left},{radarMon.Top}), state={options.WindowState}");
+            Log.WriteLine($"[RadarWindow] Creating window on monitor {Config.RadarTargetScreen} ({radarMon.Width}x{radarMon.Height} @ {radarMon.Left},{radarMon.Top})");
 
             _window = SilkWindow.Create(options);
             _window.Load += OnLoad;
@@ -64,6 +62,12 @@ namespace eft_dma_radar.Silk.UI
 
                 _gl = GL.GetApi(_window);
                 Log.WriteLine($"[RadarWindow] OpenGL: {_gl.GetStringS(StringName.Version)}");
+
+                // Apply Maximized AFTER the window is placed on the target monitor.
+                // Setting WindowState in WindowOptions causes GLFW to maximize to the
+                // primary monitor; calling it here maximizes on whichever monitor we're on.
+                if (Config.WindowMaximized)
+                    _window.WindowState = WindowState.Maximized;
 
                 // Create input context FIRST (before ImGuiController)
                 _input = _window.CreateInput();

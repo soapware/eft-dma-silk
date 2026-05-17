@@ -5,6 +5,7 @@
 using System.Runtime.CompilerServices;
 using eft_dma_radar.Silk.Tarkov.GameWorld.Player;
 using eft_dma_radar.Silk.Tarkov.Unity;
+using Silk.NET.Input;
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
@@ -24,12 +25,18 @@ namespace eft_dma_radar.Silk.UI.ESP
         #region Fields
 
         private static IWindow? _window;
+        private static IInputContext? _input;
         private static GL? _gl;
         private static GRContext? _grContext;
         private static SKSurface? _skSurface;
         private static GRBackendRenderTarget? _skBackendRenderTarget;
         private static Thread? _thread;
         private static volatile bool _running;
+
+        // Borderless-windowed fullscreen state (F11 toggle)
+        private static bool _fakeFullscreen;
+        private static Vector2D<int> _savedFsSize;
+        private static Vector2D<int> _savedFsPos;
 
         // FPS tracking
         private static int _fpsCounter;
@@ -117,21 +124,32 @@ namespace eft_dma_radar.Silk.UI.ESP
             {
                 var monitor = MonitorInfo.GetMonitor(Config.EspTargetScreen);
 
+                // Start windowed (draggable title bar) — not full-monitor.
+                // F11 fills the current monitor in borderless mode.
+                int espW = Math.Max(Config.EspWindowWidth,  320);
+                int espH = Math.Max(Config.EspWindowHeight, 240);
+                int espX = Config.EspWindowX >= 0
+                    ? Config.EspWindowX
+                    : monitor.Left + (monitor.Width  - espW) / 2;
+                int espY = Config.EspWindowY >= 0
+                    ? Config.EspWindowY
+                    : monitor.Top  + (monitor.Height - espH) / 2;
+
                 var options = WindowOptions.Default;
-                options.Size = new Vector2D<int>(monitor.Width, monitor.Height);
-                options.Position = new Vector2D<int>(monitor.Left, monitor.Top);
-                options.Title = "ESP";
-                options.VSync = false;
-                options.FramesPerSecond = Config.EspTargetFps;
-                options.UpdatesPerSecond = Config.EspTargetFps;
+                options.Size     = new Vector2D<int>(espW, espH);
+                options.Position = new Vector2D<int>(espX, espY);
+                options.Title    = "ESP Overlay";
+                options.VSync    = false;
+                options.FramesPerSecond   = Config.EspTargetFps;
+                options.UpdatesPerSecond  = Config.EspTargetFps;
                 options.PreferredStencilBufferBits = 8;
                 options.PreferredBitDepth = new Vector4D<int>(8, 8, 8, 8);
-                options.WindowBorder = WindowBorder.Resizable;
+                options.WindowBorder      = WindowBorder.Resizable;
 
                 _window = SilkWindow.Create(options);
-                _window.Load += OnLoad;
-                _window.Render += OnRender;
-                _window.Resize += OnResize;
+                _window.Load    += OnLoad;
+                _window.Render  += OnRender;
+                _window.Resize  += OnResize;
                 _window.Closing += OnClosing;
 
                 _window.Run();
@@ -154,6 +172,11 @@ namespace eft_dma_radar.Silk.UI.ESP
             try
             {
                 _gl = GL.GetApi(_window!);
+
+                // Register keyboard for F11 fullscreen toggle
+                _input = _window!.CreateInput();
+                foreach (var kb in _input.Keyboards)
+                    kb.KeyDown += OnEspKeyDown;
 
                 var glInterface = GRGlInterface.Create(name =>
                     _window!.GLContext!.TryGetProcAddress(name, out var addr) ? addr : 0);
@@ -202,14 +225,60 @@ namespace eft_dma_radar.Silk.UI.ESP
         private static void OnClosing()
         {
             _running = false;
+
+            // Persist window position/size (skip if in borderless fullscreen — coords would be monitor-fill)
+            if (!_fakeFullscreen && _window is not null)
+            {
+                Config.EspWindowWidth  = _window.Size.X;
+                Config.EspWindowHeight = _window.Size.Y;
+                Config.EspWindowX      = _window.Position.X;
+                Config.EspWindowY      = _window.Position.Y;
+                Config.MarkDirty();
+            }
+
+            _input?.Dispose();
             _skSurface?.Dispose();
             _skBackendRenderTarget?.Dispose();
             _grContext?.Dispose();
+            _input = null;
             _gl = null;
             _grContext = null;
             _skSurface = null;
             _skBackendRenderTarget = null;
             Log.WriteLine("[EspWindow] Closed.");
+        }
+
+        private static void OnEspKeyDown(IKeyboard kb, Key key, int sc)
+        {
+            if (key == Key.F11)
+                ToggleEspBorderlessFullscreen();
+        }
+
+        private static void ToggleEspBorderlessFullscreen()
+        {
+            if (_window is null) return;
+            if (_fakeFullscreen)
+            {
+                _window.WindowBorder = WindowBorder.Resizable;
+                _window.Size         = _savedFsSize;
+                _window.Position     = _savedFsPos;
+                _fakeFullscreen      = false;
+            }
+            else
+            {
+                _savedFsSize = _window.Size;
+                _savedFsPos  = _window.Position;
+                int cx = _window.Position.X + _window.Size.X / 2;
+                int cy = _window.Position.Y + _window.Size.Y / 2;
+                var mon = MonitorInfo.GetAllMonitors()
+                    .FirstOrDefault(m => cx >= m.Left && cx < m.Left + m.Width
+                                      && cy >= m.Top  && cy < m.Top  + m.Height)
+                    ?? MonitorInfo.GetMonitor(0);
+                _window.WindowBorder = WindowBorder.Hidden;
+                _window.Size         = new Vector2D<int>(mon.Width, mon.Height);
+                _window.Position     = new Vector2D<int>(mon.Left, mon.Top);
+                _fakeFullscreen      = true;
+            }
         }
 
         private static void CreateSkiaSurface()

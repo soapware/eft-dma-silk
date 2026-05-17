@@ -5,31 +5,78 @@
 namespace eft_dma_radar.Silk.UI
 {
     /// <summary>
-    /// Loads embedded Neo Sans Std font resources for SkiaSharp rendering.
-    /// Also provides system font references for MS Gothic (status banners) and Consolas (info text).
+    /// Loads font resources for SkiaSharp rendering.
+    /// <para>
+    /// <b>Regular</b> (Segoe UI from file) — full Cyrillic + Latin coverage for all label text:
+    /// player names, scav names, boss names, loot labels, killfeed, tooltips.
+    /// </para>
+    /// <para>
+    /// <b>MsGothic</b> (MS Gothic from msgothic.ttc) — status banners.
+    /// <b>Consolas</b> (from consola.ttf) — player counter, info sub-text.
+    /// </para>
     /// </summary>
     internal static class CustomFonts
     {
-        private const string FontResourceName = "eft_dma_radar.Silk.NeoSansStdRegular.otf";
+        private const string EmbeddedFontResourceName = "eft_dma_radar.Silk.NeoSansStdRegular.otf";
 
+        /// <summary>
+        /// Segoe UI — general-purpose label font with full Cyrillic + Latin coverage.
+        /// Used for all player names, scav/boss names, loot labels, killfeed, tooltips.
+        /// </summary>
         public static SKTypeface Regular { get; }
 
-        /// <summary>MS Gothic — used for status banners and ESP status text.</summary>
+        /// <summary>MS Gothic — status banners and idle-screen text.</summary>
         public static SKTypeface MsGothic { get; }
 
-        /// <summary>Consolas — used for player counter, tooltips, and info sub-text.</summary>
+        /// <summary>Consolas — player counter, info sub-lines, monospace readouts.</summary>
         public static SKTypeface Consolas { get; }
 
         static CustomFonts()
         {
-            Regular = LoadFont(FontResourceName);
-            MsGothic = LoadSystemFont("MS Gothic", "MS PGothic", "Yu Gothic", "NSimSun");
-            Consolas  = LoadSystemFont("Consolas", "Courier New", "Lucida Console");
+            Regular  = LoadLabelFont();
+            MsGothic = LoadSystemFont("msgothic.ttc", 0, "MS Gothic", "MS PGothic", "Yu Gothic");
+            Consolas  = LoadSystemFont("consola.ttf",  0, "Consolas",  "Courier New", "Lucida Console");
         }
 
-        private static SKTypeface LoadSystemFont(params string[] names)
+        // ── Segoe UI — Cyrillic-capable label font ───────────────────────────
+
+        private static SKTypeface LoadLabelFont()
         {
-            foreach (var name in names)
+            var fontsDir = Environment.GetFolderPath(Environment.SpecialFolder.Fonts);
+
+            // Prefer file-path load — guaranteed to find the right typeface
+            var path = Path.Combine(fontsDir, "segoeui.ttf");
+            if (File.Exists(path))
+            {
+                var tf = SKTypeface.FromFile(path);
+                if (tf is not null) return tf;
+            }
+
+            // Family-name fallbacks
+            foreach (var name in new[] { "Segoe UI", "Arial", "Tahoma" })
+            {
+                var tf = SKTypeface.FromFamilyName(name);
+                if (tf is not null && !tf.FamilyName.Equals("Unknown", StringComparison.OrdinalIgnoreCase))
+                    return tf;
+                tf?.Dispose();
+            }
+
+            // Last resort: embedded NeoSansStd (no Cyrillic but won't crash)
+            return LoadEmbedded(EmbeddedFontResourceName);
+        }
+
+        // ── System font loader (file-path first, family-name fallback) ────────
+
+        private static SKTypeface LoadSystemFont(string fileName, int ttcIndex, params string[] familyNameFallbacks)
+        {
+            var fontsDir = Environment.GetFolderPath(Environment.SpecialFolder.Fonts);
+            var path = Path.Combine(fontsDir, fileName);
+            if (File.Exists(path))
+            {
+                var tf = SKTypeface.FromFile(path, ttcIndex);
+                if (tf is not null) return tf;
+            }
+            foreach (var name in familyNameFallbacks)
             {
                 var tf = SKTypeface.FromFamilyName(name);
                 if (tf is not null && !tf.FamilyName.Equals("Unknown", StringComparison.OrdinalIgnoreCase))
@@ -39,18 +86,25 @@ namespace eft_dma_radar.Silk.UI
             return SKTypeface.Default;
         }
 
+        // ── Embedded font helpers ─────────────────────────────────────────────
+
+        private static SKTypeface LoadEmbedded(string resourceName)
+        {
+            using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName)
+                ?? throw new InvalidOperationException($"Embedded font resource '{resourceName}' not found.");
+            return SKTypeface.FromStream(stream);
+        }
+
         /// <summary>
-        /// Returns the raw embedded font file bytes.
-        /// Used by ImGui contexts that need to load the font from memory.
+        /// Returns the raw bytes of the embedded Neo Sans Std font.
+        /// Used by ImGui contexts that need to load the font from memory (separate from Skia).
         /// </summary>
         internal static byte[]? GetEmbeddedFontData()
         {
             try
             {
-                using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(FontResourceName);
-                if (stream is null)
-                    return null;
-
+                using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(EmbeddedFontResourceName);
+                if (stream is null) return null;
                 var data = new byte[stream.Length];
                 stream.ReadExactly(data);
                 return data;
@@ -59,13 +113,6 @@ namespace eft_dma_radar.Silk.UI
             {
                 return null;
             }
-        }
-
-        private static SKTypeface LoadFont(string resourceName)
-        {
-            using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName)
-                ?? throw new InvalidOperationException($"Embedded font resource '{resourceName}' not found.");
-            return SKTypeface.FromStream(stream);
         }
     }
 }

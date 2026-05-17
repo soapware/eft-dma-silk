@@ -140,10 +140,10 @@ namespace eft_dma_radar.Silk.UI
             IsAntialias = true,
         };
 
-        public static SKPaint TextRadarStatus { get; } = NewTextPaint(new SKColor(77, 192, 181));
+        public static SKPaint TextRadarStatus { get; } = NewTextPaint(SKColors.White);
 
         /// <summary>Subtitle text on the idle/loading screen — dim grey.</summary>
-        public static SKPaint TextRadarStatusSub { get; } = NewTextPaint(new SKColor(130, 135, 145));
+        public static SKPaint TextRadarStatusSub { get; } = NewTextPaint(new SKColor(200, 200, 200));
 
         /// <summary>Font for status subtitle (smaller than title).</summary>
         public static SKFont FontRegular18 { get; } = new(CustomFonts.Regular, 18) { Subpixel = true };

@@ -173,6 +173,9 @@ namespace eft_dma_radar.Silk.UI.ESP
             {
                 _gl = GL.GetApi(_window!);
 
+                // Set PushPin icon after window is loaded (GLFW requires loaded window)
+                RadarWindow.ApplyWindowIcon(_window!);
+
                 // Register keyboard for F11 fullscreen toggle
                 _input = _window!.CreateInput();
                 foreach (var kb in _input.Keyboards)

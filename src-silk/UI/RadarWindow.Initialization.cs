@@ -2,6 +2,7 @@
 // Licensed under the PolyForm Noncommercial License 1.0.0.
 // See LICENSE in the repository root for details.
 
+using Silk.NET.Core;
 using Silk.NET.Input;
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
@@ -21,17 +22,15 @@ namespace eft_dma_radar.Silk.UI
             Log.WriteLine("[RadarWindow] Initialize starting...");
 
             var options = WindowOptions.Default;
-            options.Title = SilkProgram.Name;
-            options.VSync = false;
-            options.FramesPerSecond = Config.TargetFps;
+            options.Title        = SilkProgram.Name;
+            options.VSync        = false;
+            options.FramesPerSecond          = Config.TargetFps;
             options.PreferredStencilBufferBits = 8;
-            options.PreferredBitDepth = new Vector4D<int>(8, 8, 8, 8);
+            options.PreferredBitDepth        = new Vector4D<int>(8, 8, 8, 8);
+            options.WindowBorder             = WindowBorder.Resizable; // explicit — ensures title bar
 
-            // Position radar on its target monitor (default: monitor 2, index 1).
-            // MonitorInfo falls back to primary if the index doesn't exist.
-            // IMPORTANT: Do NOT set WindowState here — GLFW always maximizes/fullscreens
-            // to the primary monitor when WindowState is set in WindowOptions, ignoring
-            // the Position. We open Normal and apply Maximized in OnLoad() instead.
+            // Position on the configured monitor. Do NOT set WindowState in options —
+            // GLFW ignores Position when Maximized/Fullscreen is set in options.
             var radarMon = MonitorInfo.GetMonitor(Config.RadarTargetScreen);
             options.Position = new Vector2D<int>(radarMon.Left, radarMon.Top);
             options.Size = new Vector2D<int>(
@@ -63,11 +62,8 @@ namespace eft_dma_radar.Silk.UI
                 _gl = GL.GetApi(_window);
                 Log.WriteLine($"[RadarWindow] OpenGL: {_gl.GetStringS(StringName.Version)}");
 
-                // Apply Maximized AFTER the window is placed on the target monitor.
-                // Setting WindowState in WindowOptions causes GLFW to maximize to the
-                // primary monitor; calling it here maximizes on whichever monitor we're on.
-                if (Config.WindowMaximized)
-                    _window.WindowState = WindowState.Maximized;
+                // Set PushPin icon after the window is fully loaded (GLFW requires this)
+                ApplyWindowIcon(_window);
 
                 // Create input context FIRST (before ImGuiController)
                 _input = _window.CreateInput();
@@ -222,6 +218,29 @@ namespace eft_dma_radar.Silk.UI
             if (_skSurface is null)
             {
                 Log.WriteLine($"[RadarWindow] SKSurface.Create returned null! Size={size.X}x{size.Y}, Samples={samples}, Stencil={stencilBits}");
+            }
+        }
+
+        /// <summary>
+        /// Loads the PushPin .ico and applies it to the given window's taskbar + title-bar icon.
+        /// Safe to call before OnLoad (icon is set at the OS level via GLFW).
+        /// </summary>
+        internal static void ApplyWindowIcon(IWindow window)
+        {
+            const string IconPath = @"C:\DMA\PushPin\source\push-pin.ico";
+            if (!File.Exists(IconPath)) return;
+            try
+            {
+                using var bmp = SKBitmap.Decode(IconPath)?.Copy(SKColorType.Rgba8888);
+                if (bmp is null) return;
+                var pixels = new Memory<byte>(bmp.Bytes);
+                window.SetWindowIcon(new ReadOnlySpan<RawImage>(
+                    new[] { new RawImage(bmp.Width, bmp.Height, pixels) }));
+                Log.WriteLine($"[RadarWindow] Icon set ({bmp.Width}x{bmp.Height}).");
+            }
+            catch (Exception ex)
+            {
+                Log.WriteLine($"[RadarWindow] Icon load failed: {ex.Message}");
             }
         }
     }

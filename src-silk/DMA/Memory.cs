@@ -207,6 +207,10 @@ namespace eft_dma_radar.Silk.DMA
                 if (config.MemMapEnabled)
                     args.AddRange(["-memmap", MemMapFile]);
 
+                // Prime the FT601 USB device via a short MemProcFS subprocess run.
+                // This eliminates the need for a manual warm-up script.
+                WarmUpFt601(config.DeviceStr);
+
                 // Retry indefinitely — FT601 USB may need a physical replug or
                 // time to recover after a prior process was force-killed.
                 // The radar will connect as soon as the device becomes available.
@@ -231,13 +235,14 @@ namespace eft_dma_radar.Silk.DMA
                     }
                 }
 
-                // Benchmark BEFORE registering auto-refresh so the PCIe bus is idle
-                // during measurement. RegisterAutoRefresh drives continuous TLP traffic
-                // that would starve concurrent LeechCore.Read calls.
-                RunThroughputBenchmark(_vmm);
+                // Run benchmark async — it takes 3s and would block the init thread.
+                // Fire-and-forget; DmaStats.MaxThroughputMBps will be populated shortly after.
+                Task.Run(() => RunThroughputBenchmark(_vmm));
 
-                _vmm.RegisterAutoRefresh(RefreshOption.MemoryPartial, TimeSpan.FromMilliseconds(300));
-                _vmm.RegisterAutoRefresh(RefreshOption.TlbPartial, TimeSpan.FromSeconds(2));
+                // Wider intervals reduce PCIe bus pressure competing with the
+                // 8ms RealtimeWorker scatter reads, reducing freeze risk in-raid.
+                _vmm.RegisterAutoRefresh(RefreshOption.MemoryPartial, TimeSpan.FromMilliseconds(500));
+                _vmm.RegisterAutoRefresh(RefreshOption.TlbPartial, TimeSpan.FromSeconds(3));
 
                 SetState(MemoryState.WaitingForProcess);
 
@@ -271,6 +276,49 @@ namespace eft_dma_radar.Silk.DMA
         /// Must be called before <see cref="Vmm.RegisterAutoRefresh"/>.
         /// Stores the result in <see cref="DmaStats.MaxThroughputMBps"/>.
         /// </summary>
+        /// <summary>
+        /// Runs MemProcFS.exe standalone for a brief period to prime the FT601 USB device,
+        /// then kills it and waits for the device to settle. This makes first-launch reliable
+        /// without requiring a manual warm-up script.
+        /// </summary>
+        private static void WarmUpFt601(string deviceStr)
+        {
+            string[] candidates =
+            [
+                Path.Combine(AppContext.BaseDirectory, "MemProcFS.exe"),
+                @"C:\DMA\MemProcFS\files\MemProcFS.exe",
+            ];
+            var memprocfs = candidates.FirstOrDefault(File.Exists);
+            if (memprocfs is null)
+            {
+                Log.WriteLine("[Memory] MemProcFS.exe not found — skipping FT601 warm-up.");
+                return;
+            }
+
+            Log.WriteLine($"[Memory] FT601 warm-up via MemProcFS ({Path.GetFileName(memprocfs)}) — 14s...");
+            try
+            {
+                using var p = Process.Start(new ProcessStartInfo(memprocfs, $"-device {deviceStr}")
+                {
+                    CreateNoWindow  = true,
+                    UseShellExecute = false,
+                });
+                if (p is null) return;
+                p.WaitForExit(14000);
+                if (!p.HasExited)
+                {
+                    try { p.Kill(); } catch { }
+                    p.WaitForExit(2000);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.WriteLine($"[Memory] Warm-up error: {ex.Message}");
+            }
+            Log.WriteLine("[Memory] FT601 warm-up done — settling 8s...");
+            Thread.Sleep(8000);
+        }
+
         private static void RunThroughputBenchmark(Vmm vmm)
         {
             try

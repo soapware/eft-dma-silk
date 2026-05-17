@@ -639,31 +639,119 @@ namespace eft_dma_radar.Silk.UI
 
         private static void DrawStatusMessage(SKCanvas canvas, string message, float scale, bool animated = false)
         {
-            var bounds = new SKRect(0, 0, _window.Size.X / scale, _window.Size.Y / scale);
+            float W = _window.Size.X / scale;
+            float H = _window.Size.Y / scale;
 
-            string dots = "";
+            // ── Typewriter state machine ─────────────────────────────────────
             if (animated)
             {
-                if (_statusSw.ElapsedMilliseconds > 500)
+                if (!string.Equals(message, _typewriterMsg, StringComparison.Ordinal))
                 {
-                    _statusOrder = (_statusOrder % 3) + 1;
-                    _statusSw.Restart();
+                    _typewriterMsg = message;
+                    _typewriterLen = 0;
+                    _typewriterSw.Restart();
+                    _cursorSw.Restart();
+                    _cursorVisible = true;
                 }
-                dots = _statusDots[_statusOrder];
-            }
 
-            if (!ReferenceEquals(message, _cachedStatusMessage) || _statusOrder != _cachedStatusOrder)
+                int targetLen = Math.Min(message.Length, (int)(_typewriterSw.ElapsedMilliseconds / 1000f * TypewriterCps));
+                _typewriterLen = Math.Max(_typewriterLen, targetLen);
+
+                if (_cursorSw.ElapsedMilliseconds >= 420)
+                {
+                    _cursorVisible = !_cursorVisible;
+                    _cursorSw.Restart();
+                }
+            }
+            else
             {
-                _cachedStatusMessage = message;
-                _cachedStatusOrder = _statusOrder;
-                _cachedStatusComposite = message + dots;
+                // Static messages: immediately show full text, no cursor
+                _typewriterMsg = message;
+                _typewriterLen = message.Length;
+                _cursorVisible = false;
             }
 
-            float textWidth = SKPaints.FontRegular48.MeasureText(_cachedStatusComposite);
-            float x = (bounds.Width - textWidth) / 2f;
-            float y = bounds.Height / 2f;
+            string revealed = _typewriterLen >= message.Length
+                ? message
+                : message[.._typewriterLen];
+            bool showCursor = animated && _cursorVisible;
+            string displayText = showCursor ? revealed + "█" : revealed;
 
-            canvas.DrawText(_cachedStatusComposite, x, y, SKPaints.FontRegular48, SKPaints.TextRadarStatus);
+            // ── Scanline sweep (animated states only) ────────────────────────
+            if (animated)
+            {
+                float scanT = (float)(_statusSw.ElapsedMilliseconds % ScanlinePeriodMs) / ScanlinePeriodMs;
+                // Reset the dot-timer so dots don't also tick — we've replaced dots with typewriter
+                if (_statusSw.ElapsedMilliseconds > ScanlinePeriodMs)
+                    _statusSw.Restart();
+
+                float scanY = scanT * H;
+                const float scanBandH = 48f;
+
+                using var scanPaint = new SKPaint
+                {
+                    IsAntialias = false,
+                    Shader = SKShader.CreateLinearGradient(
+                        new SKPoint(0, scanY - scanBandH * 0.5f),
+                        new SKPoint(0, scanY + scanBandH * 0.5f),
+                        [new SKColor(0, 240, 200, 0), new SKColor(0, 240, 200, 38), new SKColor(0, 240, 200, 0)],
+                        [0f, 0.5f, 1f],
+                        SKShaderTileMode.Clamp)
+                };
+                canvas.DrawRect(new SKRect(0, scanY - scanBandH, W, scanY + scanBandH), scanPaint);
+            }
+
+            // ── Background panel ─────────────────────────────────────────────
+            float panelH = 110f;
+            float panelY = H * 0.5f - panelH * 0.5f;
+            using var bgPaint = new SKPaint { Color = new SKColor(0, 0, 0, 175), IsAntialias = false };
+            canvas.DrawRect(new SKRect(0, panelY, W, panelY + panelH), bgPaint);
+            using var borderPaint = new SKPaint
+            {
+                Color = new SKColor(0, 180, 160, 80),
+                Style = SKPaintStyle.Stroke,
+                StrokeWidth = 1f,
+                IsAntialias = false
+            };
+            canvas.DrawRect(new SKRect(0, panelY, W, panelY + panelH), borderPaint);
+
+            // ── Banner text — MS Gothic ──────────────────────────────────────
+            var bannerFont = SKPaints.FontBanner;
+            float textWidth  = bannerFont.MeasureText(displayText);
+            float textX = (W - textWidth) * 0.5f;
+            float textY = H * 0.5f + bannerFont.Size * 0.35f;
+
+            // Shadow
+            using var shadowPaint = new SKPaint { Color = new SKColor(0, 0, 0, 160), IsAntialias = true };
+            canvas.DrawText(displayText, textX + 2f, textY + 2f, bannerFont, shadowPaint);
+            // Main text
+            canvas.DrawText(displayText, textX, textY, bannerFont, SKPaints.TextRadarStatus);
+
+            // ── Sub-line — Consolas ──────────────────────────────────────────
+            string subLine = GetStatusSubLine(message, animated);
+            if (!string.IsNullOrEmpty(subLine))
+            {
+                var subFont   = SKPaints.FontBannerSub;
+                float subW    = subFont.MeasureText(subLine);
+                float subX    = (W - subW) * 0.5f;
+                float subY    = textY + bannerFont.Size * 0.55f + 6f;
+                canvas.DrawText(subLine, subX + 1f, subY + 1f, subFont, shadowPaint);
+                canvas.DrawText(subLine, subX, subY, subFont, SKPaints.TextRadarStatusSub);
+            }
+        }
+
+        private static string GetStatusSubLine(string message, bool animated)
+        {
+            if (message.StartsWith("Starting", StringComparison.Ordinal))
+                return "[ INITIALIZING DMA INTERFACE ]";
+            if (message.StartsWith("Waiting", StringComparison.Ordinal))
+                return animated ? "[ MONITORING GAME PROCESS ]" : "[ STANDBY ]";
+            if (message.StartsWith("Loading Map", StringComparison.Ordinal))
+                return "[ PARSING MAP GEOMETRY ]";
+            if (message.StartsWith("In Hideout", StringComparison.Ordinal))
+                return "[ HIDEOUT MODE ACTIVE ]";
+            // Matching stages (queued, matching, loading, etc.)
+            return animated ? "[ AWAITING RAID ENTRY ]" : "";
         }
 
         /// <summary>
@@ -690,7 +778,7 @@ namespace eft_dma_radar.Silk.UI
             const float CornerR = 4f;
             const float Margin  = 8f;
 
-            var font = SKPaints.FontRegular11;
+            var font = SKPaints.FontInfo; // Consolas
 
             string label      = "Players  ";
             string shownStr   = shown.ToString();

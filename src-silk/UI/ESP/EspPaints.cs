@@ -188,7 +188,7 @@ namespace eft_dma_radar.Silk.UI.ESP
             IsAntialias = true,
         };
 
-        public static SKFont FontBar { get; } = new(CustomFonts.Regular, 11) { Subpixel = true };
+        public static SKFont FontBar { get; } = new(CustomFonts.Consolas, 11) { Subpixel = true };
 
         public static SKPaint TextBar { get; } = MakeFillPaint(255, 255, 255, 240);
 
@@ -196,7 +196,8 @@ namespace eft_dma_radar.Silk.UI.ESP
 
         #region Status Text
 
-        public static SKFont FontStatus { get; } = new(CustomFonts.Regular, 14) { Subpixel = true };
+        /// <summary>MS Gothic — matches radar status banner font family.</summary>
+        public static SKFont FontStatus { get; } = new(CustomFonts.MsGothic, 14) { Subpixel = true };
 
         public static SKPaint TextStatus { get; } = MakeFillPaint(255, 220, 60, 240);
 

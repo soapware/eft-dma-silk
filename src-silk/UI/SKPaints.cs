@@ -15,6 +15,18 @@ namespace eft_dma_radar.Silk.UI
         public static SKFont FontRegular11 { get; } = new(CustomFonts.Regular, 11) { Subpixel = true };
         public static SKFont FontRegular48 { get; } = new(CustomFonts.Regular, 48) { Subpixel = true };
 
+        // ── MS Gothic — status banners ───────────────────────────────────────
+        /// <summary>Large banner title on idle/loading screens.</summary>
+        public static SKFont FontBanner { get; } = new(CustomFonts.MsGothic, 46) { Subpixel = true };
+        /// <summary>Small sub-line beneath the banner title.</summary>
+        public static SKFont FontBannerSub { get; } = new(CustomFonts.MsGothic, 14) { Subpixel = true };
+
+        // ── Consolas — info / counter / tooltip ─────────────────────────────
+        /// <summary>Player counter overlay and status sub-text.</summary>
+        public static SKFont FontInfo { get; } = new(CustomFonts.Consolas, 11) { Subpixel = true };
+        /// <summary>Slightly larger Consolas for killfeed and tooltip bodies.</summary>
+        public static SKFont FontInfoMed { get; } = new(CustomFonts.Consolas, 13) { Subpixel = true };
+
         // Cached dynamically-sized fonts keyed by rounded size (tenths of a pixel).
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<int, SKFont> _sizedFonts = new();
 
@@ -136,8 +148,8 @@ namespace eft_dma_radar.Silk.UI
         /// <summary>Font for status subtitle (smaller than title).</summary>
         public static SKFont FontRegular18 { get; } = new(CustomFonts.Regular, 18) { Subpixel = true };
 
-        /// <summary>Font for killfeed entries (medium weight).</summary>
-        public static SKFont FontKillfeed { get; } = new(CustomFonts.Regular, 12) { Subpixel = true };
+        /// <summary>Font for killfeed entries — Consolas for monospace readability.</summary>
+        public static SKFont FontKillfeed { get; } = new(CustomFonts.Consolas, 12) { Subpixel = true };
 
         /// <summary>Normal label text for the player counter overlay.</summary>
         public static SKPaint TextPlayerCounterNormal { get; } = NewTextPaint(new SKColor(200, 200, 200, 210));
@@ -443,8 +455,8 @@ namespace eft_dma_radar.Silk.UI
         /// <summary>Wishlist highlight text inside tooltips — cyan.</summary>
         public static SKPaint TooltipWishlist { get; } = NewTextPaint(new SKColor(0, 230, 255));
 
-        /// <summary>Font used for tooltip text.</summary>
-        public static SKFont FontTooltip { get; } = new(CustomFonts.Regular, 11) { Subpixel = true };
+        /// <summary>Font used for tooltip text — Consolas for technical readability.</summary>
+        public static SKFont FontTooltip { get; } = new(CustomFonts.Consolas, 11) { Subpixel = true };
 
         #endregion
 

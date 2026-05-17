@@ -67,9 +67,21 @@ namespace eft_dma_radar.Silk.UI
         private static bool _freeMode;
         private static Vector2 _mapPanPosition;
         private static int _zoom = 100;
-        private static int _statusOrder = 1;
         private static readonly Stopwatch _statusSw = Stopwatch.StartNew();
-        private static readonly string[] _statusDots = ["", ".", "..", "..."];
+        private static readonly string[] _statusDots = ["", ".", "..", "..."]; // kept for compat
+
+        // ── Status banner animation state ────────────────────────────────────
+        // Typewriter: reveals characters progressively, blinking cursor at end.
+        // Scanline:   a bright band sweeps top-to-bottom on a 3-second loop.
+        private static string _typewriterMsg = "";
+        private static int    _typewriterLen;
+        private static readonly Stopwatch _typewriterSw = Stopwatch.StartNew();
+        private static readonly Stopwatch _cursorSw     = Stopwatch.StartNew();
+        private static bool   _cursorVisible = true;
+        // chars per second for typewriter reveal
+        private const  float  TypewriterCps = 28f;
+        // scanline period in ms
+        private const  long   ScanlinePeriodMs = 3000;
 
         // Reusable render collections — avoids per-frame allocation
         private static readonly List<Player> _renderPlayers = new(64);
@@ -136,10 +148,7 @@ namespace eft_dma_radar.Silk.UI
         private static long _cachedHideoutTotalValue = -1;
         private static string _cachedHideoutStashText = "";
 
-        // DrawStatusMessage: cached composite text
-        private static string _cachedStatusMessage = "";
-        private static int _cachedStatusOrder = -1;
-        private static string _cachedStatusComposite = "";
+        // (DrawStatusMessage state moved to typewriter fields below)
 
         // ── Cached ImGui Vector4 colors (avoid per-frame struct allocation) ─
         private static readonly Vector4 ColorMenuBarRight = new(0.55f, 0.60f, 0.65f, 1.0f);

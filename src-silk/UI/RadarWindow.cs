@@ -96,6 +96,7 @@ namespace eft_dma_radar.Silk.UI
         // Pinned font data for ImGui — must remain alive for the lifetime of the atlas
         private static GCHandle _imguiFontHandle;
         private static GCHandle _iconGlyphRangesHandle;
+        private static GCHandle _cyrillicGlyphRangesHandle;
 
         // Icon glyph ranges for UI symbols — null-terminated pairs of (first, last).
         // These cover every non-ASCII icon used in the ImGui menus/panels.

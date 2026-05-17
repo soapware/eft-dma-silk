@@ -21,17 +21,26 @@ namespace eft_dma_radar.Silk.UI
             Log.WriteLine("[RadarWindow] Initialize starting...");
 
             var options = WindowOptions.Default;
-            options.Size = new Vector2D<int>(Config.WindowWidth, Config.WindowHeight);
             options.Title = SilkProgram.Name;
             options.VSync = false;
             options.FramesPerSecond = Config.TargetFps;
             options.PreferredStencilBufferBits = 8;
             options.PreferredBitDepth = new Vector4D<int>(8, 8, 8, 8);
 
-            if (Config.WindowMaximized)
+            // Position radar on its target monitor (default: monitor 2, index 1)
+            // MonitorInfo falls back to primary if the index doesn't exist.
+            var radarMon = MonitorInfo.GetMonitor(Config.RadarTargetScreen);
+            options.Position = new Vector2D<int>(radarMon.Left, radarMon.Top);
+            options.Size = new Vector2D<int>(
+                Math.Min(Config.WindowWidth,  radarMon.Width),
+                Math.Min(Config.WindowHeight, radarMon.Height));
+
+            if (Config.WindowFullscreen)
+                options.WindowState = WindowState.Fullscreen;
+            else if (Config.WindowMaximized)
                 options.WindowState = WindowState.Maximized;
 
-            Log.WriteLine($"[RadarWindow] Creating window: {options.Size.X}x{options.Size.Y}, FPS={options.FramesPerSecond}, API={options.API}");
+            Log.WriteLine($"[RadarWindow] Creating window on monitor {Config.RadarTargetScreen} ({radarMon.Width}x{radarMon.Height} @ {radarMon.Left},{radarMon.Top}), state={options.WindowState}");
 
             _window = SilkWindow.Create(options);
             _window.Load += OnLoad;

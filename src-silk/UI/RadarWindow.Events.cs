@@ -22,7 +22,8 @@ namespace eft_dma_radar.Silk.UI
             // Persist window state
             Config.WindowWidth = _window.Size.X;
             Config.WindowHeight = _window.Size.Y;
-            Config.WindowMaximized = _window.WindowState == WindowState.Maximized;
+            Config.WindowMaximized  = _window.WindowState == WindowState.Maximized;
+            Config.WindowFullscreen = _window.WindowState == WindowState.Fullscreen;
 
             // Persist widget/panel visibility
             Config.ShowPlayersWidget = PlayerInfoWidget.IsOpen;
@@ -53,6 +54,8 @@ namespace eft_dma_radar.Silk.UI
                 _imguiFontHandle.Free();
             if (_iconGlyphRangesHandle.IsAllocated)
                 _iconGlyphRangesHandle.Free();
+            if (_cyrillicGlyphRangesHandle.IsAllocated)
+                _cyrillicGlyphRangesHandle.Free();
             _skSurface?.Dispose();
             _skBackendRenderTarget?.Dispose();
             _grContext?.Dispose();

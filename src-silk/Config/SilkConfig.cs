@@ -153,6 +153,12 @@ namespace eft_dma_radar.Silk.Config
         /// <summary>Whether the radar window starts maximized.</summary>
         public bool WindowMaximized { get; set; } = false;
 
+        /// <summary>Whether the radar window starts in fullscreen mode.</summary>
+        public bool WindowFullscreen { get; set; } = false;
+
+        /// <summary>Monitor index (0-based) for the radar window. 0 = primary. Default 1 = second monitor.</summary>
+        public int RadarTargetScreen { get; set; } = 1;
+
         /// <summary>Hide loot and other clutter; show only players.</summary>
         public bool BattleMode { get; set; } = false;
 
@@ -662,7 +668,7 @@ namespace eft_dma_radar.Silk.Config
         // ── Web Radar ───────────────────────────────────────────────────────────
 
         /// <summary>Enable the web radar HTTP server on startup.</summary>
-        public bool WebRadarEnabled { get; set; } = false;
+        public bool WebRadarEnabled { get; set; } = true;
 
         /// <summary>HTTP port for the web radar server.</summary>
         public int WebRadarPort { get; set; } = 7224;

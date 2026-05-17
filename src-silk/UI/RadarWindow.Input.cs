@@ -8,6 +8,7 @@ using eft_dma_radar.Silk.UI.Widgets;
 using ImGuiNET;
 using Silk.NET.Input;
 using Silk.NET.Maths;
+using Silk.NET.Windowing;
 
 namespace eft_dma_radar.Silk.UI
 {
@@ -218,6 +219,17 @@ namespace eft_dma_radar.Silk.UI
                 Log.WriteLine($"[RadarWindow] Debug logging {(Log.EnableDebugLogging ? "ON" : "OFF")}");
                 if (Log.EnableDebugLogging)
                     Memory.Game?.DumpAll();
+                return;
+            }
+
+            // F11 — fullscreen toggle, always fires regardless of ImGui focus
+            if (key == Key.F11)
+            {
+                bool wantFull = _window.WindowState != WindowState.Fullscreen;
+                _window.WindowState = wantFull ? WindowState.Fullscreen : WindowState.Normal;
+                Config.WindowFullscreen = wantFull;
+                Config.MarkDirty();
+                Log.WriteLine($"[RadarWindow] Fullscreen: {wantFull}");
                 return;
             }
 

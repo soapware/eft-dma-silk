@@ -863,38 +863,57 @@ namespace eft_dma_radar.Silk.UI
         }
 
         /// <summary>
-        /// Loads the embedded NeoSansStd font into ImGui's font atlas.
+        /// Loads Segoe UI (Cyrillic + Latin) into ImGui's font atlas.
+        /// Falls back to embedded NeoSansStd if segoeui.ttf is not found (Latin only).
         /// Must be called inside the onConfigureIO callback before the atlas is built.
         /// </summary>
         private static unsafe void LoadImGuiFont(ImGuiIOPtr io)
         {
-            using var stream = Assembly.GetExecutingAssembly()
-                .GetManifestResourceStream("eft_dma_radar.Silk.NeoSansStdRegular.otf");
-            if (stream is null)
+            // Glyph range: Basic Latin (0x0020–0x00FF) + Cyrillic (0x0400–0x052F)
+            // Pinned for the lifetime of the ImGui font atlas.
+            _cyrillicGlyphRangesHandle = GCHandle.Alloc(
+                new ushort[] { 0x0020, 0x00FF, 0x0400, 0x052F, 0 },
+                GCHandleType.Pinned);
+
+            var segoeUiPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.Fonts),
+                "segoeui.ttf");
+
+            if (File.Exists(segoeUiPath))
             {
-                Log.WriteLine("[RadarWindow] WARNING: Embedded font not found for ImGui, using default.");
-                return;
+                unsafe
+                {
+                    io.Fonts.AddFontFromFileTTF(
+                        segoeUiPath,
+                        13.0f,
+                        new ImFontConfigPtr((ImFontConfig*)null),
+                        _cyrillicGlyphRangesHandle.AddrOfPinnedObject());
+                }
+                Log.WriteLine("[RadarWindow] Segoe UI loaded for ImGui (13px, Cyrillic+Latin).");
             }
-
-            var fontData = new byte[stream.Length];
-            stream.ReadExactly(fontData);
-
-            // Pin the managed array — must stay pinned for the lifetime of ImGui's font atlas
-            _imguiFontHandle = GCHandle.Alloc(fontData, GCHandleType.Pinned);
-
-            // Create config with FontDataOwnedByAtlas = false so ImGui won't try to free our pinned memory
-            var config = ImGuiNative.ImFontConfig_ImFontConfig();
-            config->FontDataOwnedByAtlas = 0;
-
-            io.Fonts.AddFontFromMemoryTTF(
-                _imguiFontHandle.AddrOfPinnedObject(),
-                fontData.Length,
-                13.0f,
-                new ImFontConfigPtr(config),
-                io.Fonts.GetGlyphRangesDefault());
-
-            ImGuiNative.ImFontConfig_destroy(config);
-            Log.WriteLine("[RadarWindow] Custom font loaded for ImGui (13px).");
+            else
+            {
+                // Fallback: embedded NeoSansStd — Latin only, no Cyrillic
+                using var stream = Assembly.GetExecutingAssembly()
+                    .GetManifestResourceStream("eft_dma_radar.Silk.NeoSansStdRegular.otf");
+                if (stream is null)
+                {
+                    Log.WriteLine("[RadarWindow] WARNING: segoeui.ttf and embedded font both missing — ImGui using default.");
+                    return;
+                }
+                var fontData = new byte[stream.Length];
+                stream.ReadExactly(fontData);
+                _imguiFontHandle = GCHandle.Alloc(fontData, GCHandleType.Pinned);
+                var config = ImGuiNative.ImFontConfig_ImFontConfig();
+                config->FontDataOwnedByAtlas = 0;
+                io.Fonts.AddFontFromMemoryTTF(
+                    _imguiFontHandle.AddrOfPinnedObject(),
+                    fontData.Length, 13.0f,
+                    new ImFontConfigPtr(config),
+                    io.Fonts.GetGlyphRangesDefault());
+                ImGuiNative.ImFontConfig_destroy(config);
+                Log.WriteLine("[RadarWindow] WARNING: segoeui.ttf not found — using embedded font (no Cyrillic).");
+            }
 
             // Merge system symbol font for Unicode icon glyphs (geometric shapes, arrows, etc.)
             var symbolFontPath = Path.Combine(

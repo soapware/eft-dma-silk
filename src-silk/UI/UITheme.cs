@@ -19,9 +19,9 @@ namespace eft_dma_radar.Silk.UI
         // ── Accent (active state) ───────────────────────────────────────────
         /// <summary>The one and only "on" accent. Used by toggles, focus ring,
         /// active sidebar slot, top-bar pill on-state, etc.</summary>
-        public static readonly Vector4 Accent       = new(0.00f, 0.80f, 0.80f, 1f);
-        public static readonly Vector4 AccentSoft   = new(0.00f, 0.80f, 0.80f, 0.35f);
-        public static readonly Vector4 AccentFaint  = new(0.00f, 0.80f, 0.80f, 0.18f);
+        public static readonly Vector4 Accent       = new(1.00f, 0.00f, 0.961f, 1f);
+        public static readonly Vector4 AccentSoft   = new(1.00f, 0.00f, 0.961f, 0.35f);
+        public static readonly Vector4 AccentFaint  = new(1.00f, 0.00f, 0.961f, 0.18f);
 
         // ── Radii (one family, three sizes) ─────────────────────────────────
         /// <summary>Inner controls (steppers, small buttons, chips).</summary>

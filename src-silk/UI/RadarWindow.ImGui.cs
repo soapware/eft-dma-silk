@@ -106,9 +106,9 @@ namespace eft_dma_radar.Silk.UI
         private static readonly Vector4 PillIdleBg     = new(0.16f, 0.17f, 0.20f, 1.0f);
         private static readonly Vector4 PillIdleHover  = new(0.22f, 0.24f, 0.28f, 1.0f);
         private static readonly Vector4 PillIdleActive = new(0.26f, 0.28f, 0.32f, 1.0f);
-        private static readonly Vector4 PillOnBg       = new(0.20f, 0.55f, 0.55f, 1.0f);
-        private static readonly Vector4 PillOnHover    = new(0.28f, 0.65f, 0.65f, 1.0f);
-        private static readonly Vector4 PillOnActive   = new(0.18f, 0.48f, 0.48f, 1.0f);
+        private static readonly Vector4 PillOnBg       = new(0.300f, 0.620f, 0.290f, 1.0f);
+        private static readonly Vector4 PillOnHover    = new(0.420f, 0.878f, 0.404f, 1.0f);
+        private static readonly Vector4 PillOnActive   = new(0.220f, 0.500f, 0.210f, 1.0f);
         private static readonly Vector4 PillDividerCol = new(0.30f, 0.32f, 0.36f, 1.0f);
 
         /// <summary>
@@ -774,9 +774,9 @@ namespace eft_dma_radar.Silk.UI
 
             // ── Accent palette ──────────────────────────────────────────────────
             // Subtle teal accent for interactive elements
-            var accentBase   = new Vector4(0.22f, 0.55f, 0.55f, 1.0f);
-            var accentHover  = new Vector4(0.28f, 0.65f, 0.65f, 1.0f);
-            var accentActive = new Vector4(0.18f, 0.48f, 0.48f, 1.0f);
+            var accentBase   = new Vector4(0.70f, 0.00f, 0.67f, 1.0f);
+            var accentHover  = new Vector4(1.00f, 0.00f, 0.961f, 1.0f);
+            var accentActive = new Vector4(0.55f, 0.00f, 0.53f, 1.0f);
 
             var colors = style.Colors;
 
@@ -824,7 +824,7 @@ namespace eft_dma_radar.Silk.UI
             colors[(int)ImGuiCol.SliderGrabActive]    = accentHover;
 
             // Checkboxes
-            colors[(int)ImGuiCol.CheckMark]           = new Vector4(0.30f, 0.75f, 0.70f, 1.0f);
+            colors[(int)ImGuiCol.CheckMark]           = new Vector4(1.00f, 0.00f, 0.961f, 1.0f);
 
             // Scrollbar
             colors[(int)ImGuiCol.ScrollbarBg]        = new Vector4(0.06f, 0.06f, 0.08f, 0.6f);

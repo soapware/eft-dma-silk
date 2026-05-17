@@ -644,54 +644,84 @@ namespace eft_dma_radar.Silk.UI
 
             // ── Wave ping-pong animation ─────────────────────────────────────
             string displayText;
+            _cyrillicPositions.Clear();
             if (animated)
             {
                 long nowMs = Environment.TickCount64;
                 float dt = _waveLastMs == 0 ? 0f : (nowMs - _waveLastMs) / 1000f;
                 _waveLastMs = nowMs;
 
-                _wavePos += (_waveRight ? WaveSpeed : -WaveSpeed) * dt;
-                if (_wavePos >= 1f) { _wavePos = 1f; _waveRight = false; }
-                if (_wavePos <= 0f) { _wavePos = 0f; _waveRight = true;  }
+                if (nowMs >= _wavePauseUntilMs)
+                {
+                    _wavePos += (_waveRight ? WaveSpeed : -WaveSpeed) * dt;
+                    if (_wavePos >= 1f)
+                    {
+                        _wavePos = 1f; _waveRight = false;
+                        _wavePauseUntilMs = nowMs + _waveRng.Next(500, 2500);
+                    }
+                    if (_wavePos <= 0f)
+                    {
+                        _wavePos = 0f; _waveRight = true;
+                        _wavePauseUntilMs = nowMs + _waveRng.Next(500, 2500);
+                    }
+                }
 
                 // 1-in-20 chance to toggle Russian glitch characters in trail
                 if (_waveRng.Next(20) == 0) _waveRussian = !_waveRussian;
 
-                displayText = ApplyWave(message, _wavePos, _waveRussian);
+                displayText = (nowMs < _wavePauseUntilMs) ? message : ApplyWave(message, _wavePos, _waveRussian);
             }
             else
             {
                 displayText = message;
-                _waveLastMs = 0; // reset so wave starts fresh on next animated call
-                _wavePos    = 0f;
-                _waveRight  = true;
+                _waveLastMs       = 0;
+                _wavePos          = 0f;
+                _waveRight        = true;
+                _wavePauseUntilMs = 0;
             }
 
             // ── Background panel ─────────────────────────────────────────────
-            float panelH = 190f;
+            float panelH = 270f;
             float panelY = H * 0.5f - panelH * 0.5f;
             using var bgPaint = new SKPaint { Color = new SKColor(0, 0, 0, 175), IsAntialias = false };
             canvas.DrawRect(new SKRect(0, panelY, W, panelY + panelH), bgPaint);
             using var borderPaint = new SKPaint
             {
-                Color = new SKColor(0, 180, 160, 80),
+                Color = new SKColor(255, 0, 245, 80),
                 Style = SKPaintStyle.Stroke,
                 StrokeWidth = 1f,
                 IsAntialias = false
             };
             canvas.DrawRect(new SKRect(0, panelY, W, panelY + panelH), borderPaint);
 
-            // ── Banner text — MS Gothic ──────────────────────────────────────
+            // ── Banner text — Cutive Mono ────────────────────────────────────
             var bannerFont = SKPaints.FontBanner;
             float textWidth  = bannerFont.MeasureText(displayText);
             float textX = (W - textWidth) * 0.5f;
             float textY = H * 0.5f + bannerFont.Size * 0.35f;
 
-            // Shadow
             using var shadowPaint = new SKPaint { Color = new SKColor(0, 0, 0, 160), IsAntialias = true };
-            canvas.DrawText(displayText, textX + 2f, textY + 2f, bannerFont, shadowPaint);
-            // Main text
-            canvas.DrawText(displayText, textX, textY, bannerFont, SKPaints.TextRadarStatus);
+
+            if (animated && _cyrillicPositions.Count > 0)
+            {
+                // Per-char render: Cyrillic positions in red, others white
+                using var redPaint = new SKPaint { Color = new SKColor(220, 30, 30), IsAntialias = true };
+                float cx = textX;
+                for (int i = 0; i < displayText.Length; i++)
+                {
+                    string ch = displayText[i].ToString();
+                    float cw = bannerFont.MeasureText(ch);
+                    var paint = _cyrillicPositions.Contains(i) ? redPaint : SKPaints.TextRadarStatus;
+                    canvas.DrawText(ch, cx + 2f, textY + 2f, bannerFont, shadowPaint);
+                    canvas.DrawText(ch, cx, textY, bannerFont, paint);
+                    cx += cw;
+                }
+            }
+            else
+            {
+                canvas.DrawText(displayText, textX + 2f, textY + 2f, bannerFont, shadowPaint);
+                canvas.DrawText(displayText, textX, textY, bannerFont, SKPaints.TextRadarStatus);
+            }
 
             // ── Sub-line — Consolas ──────────────────────────────────────────
             string subLine = GetStatusSubLine(message, animated);
@@ -737,11 +767,11 @@ namespace eft_dma_radar.Silk.UI
 
         private static string ApplyWave(string text, float pos, bool useRussian)
         {
+            // _cyrillicPositions cleared by caller; populated here for red rendering
             if (text.Length == 0) return text;
             var sb = new System.Text.StringBuilder(text);
             int crest = (int)(pos * (text.Length - 1));
 
-            // Zone sizes scale with text length so short messages stay legible
             int leadLen  = Math.Max(1, text.Length / 12);
             int trailLen = Math.Max(2, text.Length / 4 - leadLen);
 
@@ -752,7 +782,10 @@ namespace eft_dma_radar.Silk.UI
             for (int i = trailStart; i < crest; i++)
             {
                 if (useRussian && _waveRng.Next(3) == 0)
+                {
                     sb[i] = RussianGhost[_waveRng.Next(RussianGhost.Length)];
+                    _cyrillicPositions.Add(i);
+                }
                 else
                     sb[i] = WavePool[_waveRng.Next(WavePool.Length)];
             }
@@ -780,7 +813,7 @@ namespace eft_dma_radar.Silk.UI
 
             using var borderPaint = new SKPaint
             {
-                Color = new SKColor(0, 180, 160, 120),
+                Color = new SKColor(255, 0, 245, 120),
                 Style = SKPaintStyle.Stroke,
                 StrokeWidth = 1f,
                 IsAntialias = false

@@ -79,7 +79,7 @@ namespace eft_dma_radar.Silk.UI
         private static long  _waveLastMs = 0;
         private static bool  _waveRussian = false;
         private static readonly Random _waveRng = new();
-        private const  float  WaveSpeed = 0.105f; // fraction/second (~quarter of original)
+        private const  float  WaveSpeed = 0.158f; // fraction/second (0.105 × 1.5)
         private static readonly char[] WavePool =
         [
             '█','▓','▒','░','▄','▀','▌','▐','▪','▫','▬','■','□',
@@ -87,6 +87,8 @@ namespace eft_dma_radar.Silk.UI
             '±','×','÷','≈','∞','≡','√','∑','·','•','#','@','%','*','|','~'
         ];
         private const string RussianGhost = "Ожидание начала рейда";
+        private static long _wavePauseUntilMs = 0; // ms timestamp until wave resumes after edge pause
+        private static readonly HashSet<int> _cyrillicPositions = new(8); // populated by ApplyWave
 
         // Sub-line blinking cursor (independent 2 Hz blink)
         private static readonly Stopwatch _cursorBlinkSw = Stopwatch.StartNew();
@@ -171,7 +173,7 @@ namespace eft_dma_radar.Silk.UI
         private static readonly Vector4 ColorHideoutDot = new(1.00f, 0.84f, 0.00f, 1f);
         private static readonly Vector4 ColorStatusText = new(0.60f, 0.62f, 0.65f, 1f);
         private static readonly Vector4 ColorStatusSeparator = new(0.50f, 0.52f, 0.55f, 1f);
-        private static readonly Vector4 ColorRaidDot = new(0.30f, 0.75f, 0.70f, 1f);
+        private static readonly Vector4 ColorRaidDot = new(1.00f, 0.00f, 0.961f, 1f);
         private static readonly Vector4 ColorSaveNotify = new(0.30f, 0.80f, 0.50f, 1f);
         private static readonly Vector4 ColorEnergyHydrationOk = new(0.55f, 0.72f, 0.55f, 1f);
         private static readonly Vector4 ColorEnergyHydrationLow = new(0.90f, 0.65f, 0.20f, 1f);
@@ -183,7 +185,7 @@ namespace eft_dma_radar.Silk.UI
         private static readonly Vector4 ColorChipBorder = new(0.28f, 0.30f, 0.34f, 1.0f);
         private static readonly Vector4 ColorChipLabel = new(0.55f, 0.58f, 0.62f, 1.0f);
         private static readonly Vector4 ColorChipValue = new(0.92f, 0.94f, 0.96f, 1.0f);
-        private static readonly Vector4 ColorChipAccent = new(0.30f, 0.75f, 0.70f, 1.0f); // cyan
+        private static readonly Vector4 ColorChipAccent = new(1.00f, 0.00f, 0.961f, 1.0f); // magenta
         private static readonly Vector4 ColorChipWarn   = new(0.90f, 0.65f, 0.20f, 1.0f);
         private static readonly Vector4 ColorChipCrit   = new(0.90f, 0.30f, 0.30f, 1.0f);
 

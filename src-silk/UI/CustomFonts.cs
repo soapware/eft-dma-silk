@@ -25,17 +25,40 @@ namespace eft_dma_radar.Silk.UI
         /// </summary>
         public static SKTypeface Regular { get; }
 
-        /// <summary>MS Gothic — status banners and idle-screen text.</summary>
+        /// <summary>MS Gothic — legacy, retained for compatibility.</summary>
         public static SKTypeface MsGothic { get; }
+
+        /// <summary>Cutive Mono — status banners and idle-screen text.</summary>
+        public static SKTypeface CutiveMono { get; }
 
         /// <summary>Consolas — player counter, info sub-lines, monospace readouts.</summary>
         public static SKTypeface Consolas { get; }
 
         static CustomFonts()
         {
-            Regular  = LoadLabelFont();
-            MsGothic = LoadSystemFont("msgothic.ttc", 0, "MS Gothic", "MS PGothic", "Yu Gothic");
-            Consolas  = LoadSystemFont("consola.ttf",  0, "Consolas",  "Courier New", "Lucida Console");
+            Regular    = LoadLabelFont();
+            MsGothic   = LoadSystemFont("msgothic.ttc", 0, "MS Gothic", "MS PGothic", "Yu Gothic");
+            CutiveMono = LoadCutiveMono();
+            Consolas   = LoadSystemFont("consola.ttf",  0, "Consolas",  "Courier New", "Lucida Console");
+        }
+
+        private static SKTypeface LoadCutiveMono()
+        {
+            const string bundled = @"C:\DMA\eft-dma-radar-silk\src-silk\assets\fonts\CutiveMono-Regular.ttf";
+            if (File.Exists(bundled))
+            {
+                var tf = SKTypeface.FromFile(bundled);
+                if (tf is not null) return tf;
+            }
+            // Fallback to system monospace fonts
+            foreach (var name in new[] { "Courier New", "Lucida Console", "Consolas" })
+            {
+                var tf = SKTypeface.FromFamilyName(name, SKFontStyle.Normal);
+                if (tf is not null && !tf.FamilyName.Equals("Unknown", StringComparison.OrdinalIgnoreCase))
+                    return tf;
+                tf?.Dispose();
+            }
+            return SKTypeface.Default;
         }
 
         // ── Segoe UI — Cyrillic-capable label font ───────────────────────────

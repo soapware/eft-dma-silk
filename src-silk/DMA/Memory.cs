@@ -207,31 +207,42 @@ namespace eft_dma_radar.Silk.DMA
                 if (config.MemMapEnabled)
                     args.AddRange(["-memmap", MemMapFile]);
 
-                // Prime the FT601 USB device via a short MemProcFS subprocess run.
-                // This eliminates the need for a manual warm-up script.
-                WarmUpFt601(config.DeviceStr);
-
-                // Retry indefinitely — FT601 USB may need a physical replug or
-                // time to recover after a prior process was force-killed.
-                // The radar will connect as soon as the device becomes available.
-                int attempt = 0;
-                while (true)
+                // Fast path: try to connect without warm-up first (saves 22s on ready hardware)
+                bool connected = false;
+                Log.WriteLine("[Memory] Attempting fast VMM connection (no warm-up)...");
+                try
                 {
-                    attempt++;
-                    try
+                    _vmm = new Vmm([.. args]);
+                    Log.WriteLine("[Memory] VMM connected immediately — no warm-up needed.");
+                    connected = true;
+                }
+                catch (VmmSharpEx.VmmException)
+                {
+                    Log.WriteLine("[Memory] Fast path failed — running FT601 warm-up...");
+                    WarmUpFt601(config.DeviceStr);
+                }
+
+                if (!connected)
+                {
+                    int attempt = 0;
+                    while (true)
                     {
-                        _vmm = new Vmm([.. args]);
-                        Log.WriteLine($"[Memory] VMM connected on attempt {attempt}.");
-                        break;
-                    }
-                    catch (VmmSharpEx.VmmException ex)
-                    {
-                        if (attempt == 1)
-                            Log.WriteLine("[Memory] VMM init failed. If this persists, unplug and replug the USB cable from the DMA card.");
-                        if (attempt % 4 == 0)
-                            Log.WriteLine($"[Memory] Still waiting for DMA device... (attempt {attempt}) — replug USB cable if stuck.");
-                        Log.WriteLine($"[Memory] VMM attempt {attempt} failed ({ex.Message}), retrying in 8s...");
-                        Thread.Sleep(8000);
+                        attempt++;
+                        try
+                        {
+                            _vmm = new Vmm([.. args]);
+                            Log.WriteLine($"[Memory] VMM connected on attempt {attempt}.");
+                            break;
+                        }
+                        catch (VmmSharpEx.VmmException ex)
+                        {
+                            if (attempt == 1)
+                                Log.WriteLine("[Memory] VMM init failed. Replug USB cable from DMA card if stuck.");
+                            if (attempt % 4 == 0)
+                                Log.WriteLine($"[Memory] Still waiting for DMA device... (attempt {attempt})");
+                            Log.WriteLine($"[Memory] Attempt {attempt} failed ({ex.Message}), retrying in 3s...");
+                            Thread.Sleep(3000);
+                        }
                     }
                 }
 
@@ -295,7 +306,7 @@ namespace eft_dma_radar.Silk.DMA
                 return;
             }
 
-            Log.WriteLine($"[Memory] FT601 warm-up via MemProcFS ({Path.GetFileName(memprocfs)}) — 14s...");
+            Log.WriteLine($"[Memory] FT601 warm-up via MemProcFS ({Path.GetFileName(memprocfs)}) — 10s...");
             try
             {
                 using var p = Process.Start(new ProcessStartInfo(memprocfs, $"-device {deviceStr}")
@@ -304,7 +315,7 @@ namespace eft_dma_radar.Silk.DMA
                     UseShellExecute = false,
                 });
                 if (p is null) return;
-                p.WaitForExit(14000);
+                p.WaitForExit(10000);
                 if (!p.HasExited)
                 {
                     try { p.Kill(); } catch { }
@@ -315,8 +326,8 @@ namespace eft_dma_radar.Silk.DMA
             {
                 Log.WriteLine($"[Memory] Warm-up error: {ex.Message}");
             }
-            Log.WriteLine("[Memory] FT601 warm-up done — settling 8s...");
-            Thread.Sleep(8000);
+            Log.WriteLine("[Memory] FT601 warm-up done — settling 5s...");
+            Thread.Sleep(5000);
         }
 
         private static void RunThroughputBenchmark(Vmm vmm)

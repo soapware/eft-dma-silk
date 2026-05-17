@@ -19,7 +19,7 @@ namespace eft_dma_radar.Silk.UI.Controls
     /// </summary>
     internal static class UIControls
     {
-        private static readonly Vector4 AccentCyan   = new(0.30f, 0.75f, 0.70f, 1.00f);
+        private static readonly Vector4 AccentCyan   = new(1.00f, 0.00f, 0.961f, 1.00f);
         private static readonly Vector4 RowBg        = new(1.00f, 1.00f, 1.00f, 0.03f);
         private static readonly Vector4 RowBgHover   = new(1.00f, 1.00f, 1.00f, 0.07f);
         private static readonly Vector4 RowText     = new(0.90f, 0.92f, 0.94f, 1.00f);

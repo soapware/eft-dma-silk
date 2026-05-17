@@ -112,11 +112,11 @@ namespace eft_dma_radar.Silk.UI.Shell
         ];
 
         // Colors (UITheme-aligned)
-        private static readonly Vector4 BgColor       = new(0.08f, 0.08f, 0.10f, 0.96f);
+        private static readonly Vector4 BgColor       = new(0.141f, 0.141f, 0.141f, 0.96f);
         private static readonly Vector4 BorderColor   = new(0.25f, 0.28f, 0.30f, 0.60f);
         private static readonly Vector4 IdleColor     = new(0.55f, 0.60f, 0.65f, 1.00f);
-        private static readonly Vector4 HoverColor    = new(0.28f, 0.65f, 0.65f, 1.00f);
-        private static readonly Vector4 ActiveColor   = new(0.30f, 0.75f, 0.70f, 1.00f);
+        private static readonly Vector4 HoverColor    = new(0.75f, 0.00f, 0.72f, 1.00f);
+        private static readonly Vector4 ActiveColor   = new(1.00f, 0.00f, 0.961f, 1.00f);
         private static readonly Vector4 HotkeyColor   = new(0.45f, 0.47f, 0.50f, 1.00f);
 
         /// <summary>Draws the sidebar inside the main viewport, below the menu bar.</summary>

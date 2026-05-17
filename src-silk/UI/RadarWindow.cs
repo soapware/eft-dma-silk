@@ -73,7 +73,7 @@ namespace eft_dma_radar.Silk.UI
 
         // ── Status banner animation state ────────────────────────────────────
         // Wave ping-pong: a crest sweeps left→right→left replacing chars with
-        // block chars. Scanline sweeps top→bottom behind it.
+        // random block chars from WavePool; occasional Cyrillic glitch in trail.
         private static float _wavePos    = 0f;    // 0..1 fraction along text
         private static bool  _waveRight  = true;  // sweep direction
         private static long  _waveLastMs = 0;
@@ -83,8 +83,10 @@ namespace eft_dma_radar.Silk.UI
         private static readonly char[] WavePool =
             ['█', '▓', '▒', '░', '▄', '▀', '▌', '▐', '█', '▓', '▒', '░', '▄', '▀'];
         private const string RussianGhost = "Ожидание начала рейда";
-        // scanline period in ms
-        private const  long   ScanlinePeriodMs = 3000;
+
+        // Sub-line blinking cursor (independent 2 Hz blink)
+        private static readonly Stopwatch _cursorBlinkSw = Stopwatch.StartNew();
+        private const long CursorBlinkMs = 500;
 
         // Reusable render collections — avoids per-frame allocation
         private static readonly List<Player> _renderPlayers = new(64);

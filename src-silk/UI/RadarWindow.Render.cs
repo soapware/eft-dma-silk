@@ -654,8 +654,8 @@ namespace eft_dma_radar.Silk.UI
                 if (_wavePos >= 1f) { _wavePos = 1f; _waveRight = false; }
                 if (_wavePos <= 0f) { _wavePos = 0f; _waveRight = true;  }
 
-                // 1-in-40 chance to toggle Russian glitch characters in trail
-                if (_waveRng.Next(40) == 0) _waveRussian = !_waveRussian;
+                // 1-in-20 chance to toggle Russian glitch characters in trail
+                if (_waveRng.Next(20) == 0) _waveRussian = !_waveRussian;
 
                 displayText = ApplyWave(message, _wavePos, _waveRussian);
             }
@@ -667,32 +667,8 @@ namespace eft_dma_radar.Silk.UI
                 _waveRight  = true;
             }
 
-            // ── Scanline sweep (animated states only) ────────────────────────
-            if (animated)
-            {
-                float scanT = (float)(_statusSw.ElapsedMilliseconds % ScanlinePeriodMs) / ScanlinePeriodMs;
-                // Reset the dot-timer so dots don't also tick — we've replaced dots with typewriter
-                if (_statusSw.ElapsedMilliseconds > ScanlinePeriodMs)
-                    _statusSw.Restart();
-
-                float scanY = scanT * H;
-                const float scanBandH = 48f;
-
-                using var scanPaint = new SKPaint
-                {
-                    IsAntialias = false,
-                    Shader = SKShader.CreateLinearGradient(
-                        new SKPoint(0, scanY - scanBandH * 0.5f),
-                        new SKPoint(0, scanY + scanBandH * 0.5f),
-                        [new SKColor(0, 240, 200, 0), new SKColor(0, 240, 200, 38), new SKColor(0, 240, 200, 0)],
-                        [0f, 0.5f, 1f],
-                        SKShaderTileMode.Clamp)
-                };
-                canvas.DrawRect(new SKRect(0, scanY - scanBandH, W, scanY + scanBandH), scanPaint);
-            }
-
             // ── Background panel ─────────────────────────────────────────────
-            float panelH = 110f;
+            float panelH = 190f;
             float panelY = H * 0.5f - panelH * 0.5f;
             using var bgPaint = new SKPaint { Color = new SKColor(0, 0, 0, 175), IsAntialias = false };
             canvas.DrawRect(new SKRect(0, panelY, W, panelY + panelH), bgPaint);
@@ -719,14 +695,29 @@ namespace eft_dma_radar.Silk.UI
 
             // ── Sub-line — Consolas ──────────────────────────────────────────
             string subLine = GetStatusSubLine(message, animated);
+            float subY = textY + bannerFont.Size * 0.55f + 6f;
             if (!string.IsNullOrEmpty(subLine))
             {
-                var subFont   = SKPaints.FontBannerSub;
-                float subW    = subFont.MeasureText(subLine);
-                float subX    = (W - subW) * 0.5f;
-                float subY    = textY + bannerFont.Size * 0.55f + 6f;
+                // Inject blinking cursor before closing bracket on animated states
+                if (animated && subLine.EndsWith("]"))
+                {
+                    bool cursorOn = (_cursorBlinkSw.ElapsedMilliseconds / CursorBlinkMs) % 2 == 0;
+                    char cursor = cursorOn ? '█' : ' ';
+                    subLine = subLine[..^1] + cursor + "]";
+                }
+
+                var subFont = SKPaints.FontBannerSub;
+                float subW  = subFont.MeasureText(subLine);
+                float subX  = (W - subW) * 0.5f;
                 canvas.DrawText(subLine, subX + 1f, subY + 1f, subFont, shadowPaint);
                 canvas.DrawText(subLine, subX, subY, subFont, SKPaints.TextRadarStatusSub);
+            }
+
+            // ── DMA stats box ────────────────────────────────────────────────
+            if (animated)
+            {
+                float boxTopY = subY + SKPaints.FontBannerSub.Size * 1.8f;
+                DrawDmaStatsBox(canvas, W, boxTopY);
             }
         }
 
@@ -744,32 +735,58 @@ namespace eft_dma_radar.Silk.UI
             return animated ? "[ AWAITING RAID ENTRY ]" : "";
         }
 
-        /// <summary>
-        /// Applies the wave ping-pong animation to the status text.
-        /// Chars near the crest are replaced with progressively lighter block characters;
-        /// with 1-in-40 probability the trail zone shows Cyrillic glitch text instead.
-        /// </summary>
         private static string ApplyWave(string text, float pos, bool useRussian)
         {
             if (text.Length == 0) return text;
             var sb = new System.Text.StringBuilder(text);
             int crest = (int)(pos * (text.Length - 1));
 
-            // Lead zone: 1-2 chars ahead of crest → lightest block
+            // Lead zone: 1-2 chars ahead of crest → random light block each frame
             for (int i = crest; i < Math.Min(crest + 2, text.Length); i++)
-                sb[i] = '░';
+                sb[i] = WavePool[_waveRng.Next(2, 5)]; // indices 2-4: '▒','░','▄'
 
-            // Active trail: up to 6 chars behind crest → wave pool or Russian ghost
-            for (int i = Math.Max(0, crest - 6); i < crest; i++)
+            // Trail zone: up to 8 chars behind crest — each char independently random
+            // When useRussian, 1-in-3 chance per char swaps to a random Cyrillic char
+            int trailStart = Math.Max(0, crest - 8);
+            for (int i = trailStart; i < crest; i++)
             {
-                float d  = (float)(crest - i) / 6f;
-                int   pi = Math.Clamp((int)(d * (WavePool.Length - 1)), 0, WavePool.Length - 1);
-                if (useRussian && i < RussianGhost.Length)
-                    sb[i] = RussianGhost[i];
+                if (useRussian && _waveRng.Next(3) == 0)
+                    sb[i] = RussianGhost[_waveRng.Next(RussianGhost.Length)];
                 else
-                    sb[i] = WavePool[pi];
+                    sb[i] = WavePool[_waveRng.Next(WavePool.Length)];
             }
             return sb.ToString();
+        }
+
+        private static void DrawDmaStatsBox(SKCanvas canvas, float W, float boxTopY)
+        {
+            string cur   = $"{DMA.DmaStats.ReadMBpsCurrent,6:F0} MB/s";
+            string peak  = $"{DMA.DmaStats.ReadMBpsPeak,6:F0} MB/s";
+            string hwmax = $"{DMA.DmaStats.MaxThroughputMBps,6:F0} MB/s";
+            string fps   = $"{DMA.DmaStats.RealtimeFps,5}";
+            string trips = $"{DMA.DmaStats.TripsPerSecond,7:N0}";
+
+            string[] lines =
+            [
+                "┌──────────┬──────────┬──────────┬─────────┬───────────┐",
+                "│  CURRENT │   PEAK   │  HW MAX  │   FPS   │  TRIPS/S  │",
+                "├──────────┼──────────┼──────────┼─────────┼───────────┤",
+                $"│ {cur} │ {peak} │ {hwmax} │{fps}    │{trips}    │",
+                "└──────────┴──────────┴──────────┴─────────┴───────────┘",
+            ];
+
+            var font  = SKPaints.FontBannerSub;
+            float lineH = font.Size * 1.35f;
+            float y   = boxTopY + font.Size;
+            using var shadowPaint = new SKPaint { Color = new SKColor(0, 0, 0, 140), IsAntialias = true };
+            foreach (var line in lines)
+            {
+                float lw = font.MeasureText(line);
+                float lx = (W - lw) * 0.5f;
+                canvas.DrawText(line, lx + 1f, y + 1f, font, shadowPaint);
+                canvas.DrawText(line, lx, y, font, SKPaints.TextRadarStatusSub);
+                y += lineH;
+            }
         }
 
         /// <summary>

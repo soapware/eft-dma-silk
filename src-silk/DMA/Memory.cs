@@ -566,6 +566,7 @@ namespace eft_dma_radar.Silk.DMA
                 catch (Exception ex)
                 {
                     if (_shutdown) break;
+                    DmaStats.RecordFault();
                     Log.WriteLine($"[Memory] CRITICAL in game loop: {ex}");
                     Notify("CRITICAL error in game loop", NotificationLevel.Error);
                     break;

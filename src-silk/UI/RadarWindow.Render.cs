@@ -741,13 +741,14 @@ namespace eft_dma_radar.Silk.UI
             var sb = new System.Text.StringBuilder(text);
             int crest = (int)(pos * (text.Length - 1));
 
-            // Lead zone: 1-2 chars ahead of crest → random light block each frame
-            for (int i = crest; i < Math.Min(crest + 2, text.Length); i++)
-                sb[i] = WavePool[_waveRng.Next(2, 5)]; // indices 2-4: '▒','░','▄'
+            // Zone sizes scale with text length so short messages stay legible
+            int leadLen  = Math.Max(1, text.Length / 12);
+            int trailLen = Math.Max(2, text.Length / 4 - leadLen);
 
-            // Trail zone: up to 8 chars behind crest — each char independently random
-            // When useRussian, 1-in-3 chance per char swaps to a random Cyrillic char
-            int trailStart = Math.Max(0, crest - 8);
+            for (int i = crest; i < Math.Min(crest + leadLen, text.Length); i++)
+                sb[i] = WavePool[_waveRng.Next(WavePool.Length)];
+
+            int trailStart = Math.Max(0, crest - trailLen);
             for (int i = trailStart; i < crest; i++)
             {
                 if (useRussian && _waveRng.Next(3) == 0)
@@ -760,33 +761,53 @@ namespace eft_dma_radar.Silk.UI
 
         private static void DrawDmaStatsBox(SKCanvas canvas, float W, float boxTopY)
         {
-            string cur   = $"{DMA.DmaStats.ReadMBpsCurrent,6:F0} MB/s";
-            string peak  = $"{DMA.DmaStats.ReadMBpsPeak,6:F0} MB/s";
-            string hwmax = $"{DMA.DmaStats.MaxThroughputMBps,6:F0} MB/s";
-            string fps   = $"{DMA.DmaStats.RealtimeFps,5}";
-            string trips = $"{DMA.DmaStats.TripsPerSecond,7:N0}";
+            var font    = SKPaints.FontBannerSub;
+            const float padX = 18f;
+            const float padY = 5f;
+            float lineH = font.Size + padY * 2f;
 
-            string[] lines =
-            [
-                "┌──────────┬──────────┬──────────┬─────────┬───────────┐",
-                "│  CURRENT │   PEAK   │  HW MAX  │   FPS   │  TRIPS/S  │",
-                "├──────────┼──────────┼──────────┼─────────┼───────────┤",
-                $"│ {cur} │ {peak} │ {hwmax} │{fps}    │{trips}    │",
-                "└──────────┴──────────┴──────────┴─────────┴───────────┘",
-            ];
+            string hwMaxLabel = "HW MAX";
+            string hwMaxValue = $"{DMA.DmaStats.MaxThroughputMBps:F0} MB/s";
+            string faultLabel = "FAULTS";
+            string faultValue = $"{DMA.DmaStats.FaultCount}";
 
-            var font  = SKPaints.FontBannerSub;
-            float lineH = font.Size * 1.35f;
-            float y   = boxTopY + font.Size;
-            using var shadowPaint = new SKPaint { Color = new SKColor(0, 0, 0, 140), IsAntialias = true };
-            foreach (var line in lines)
+            float col1W = Math.Max(font.MeasureText(hwMaxLabel), font.MeasureText(hwMaxValue)) + padX * 2f;
+            float col2W = Math.Max(font.MeasureText(faultLabel), font.MeasureText(faultValue)) + padX * 2f;
+            float boxW  = col1W + col2W + 1f;
+            float boxH  = lineH * 2f + 2f;
+            float boxX  = (W - boxW) * 0.5f;
+            float boxY  = boxTopY;
+
+            using var borderPaint = new SKPaint
             {
-                float lw = font.MeasureText(line);
-                float lx = (W - lw) * 0.5f;
-                canvas.DrawText(line, lx + 1f, y + 1f, font, shadowPaint);
-                canvas.DrawText(line, lx, y, font, SKPaints.TextRadarStatusSub);
-                y += lineH;
+                Color = new SKColor(0, 180, 160, 120),
+                Style = SKPaintStyle.Stroke,
+                StrokeWidth = 1f,
+                IsAntialias = false
+            };
+            canvas.DrawRect(new SKRect(boxX, boxY, boxX + boxW, boxY + boxH), borderPaint);
+            float divX = boxX + col1W;
+            canvas.DrawLine(divX, boxY, divX, boxY + boxH, borderPaint);
+            float sepY = boxY + lineH;
+            canvas.DrawLine(boxX, sepY, boxX + boxW, sepY, borderPaint);
+
+            using var shadowPaint = new SKPaint { Color = new SKColor(0, 0, 0, 140), IsAntialias = true };
+            float labelY = boxY + padY + font.Size;
+            float valueY = sepY  + padY + font.Size;
+            float c1cx   = boxX + col1W * 0.5f;
+            float c2cx   = divX + col2W * 0.5f;
+
+            void DrawCentered(string s, float cx, float y, SKPaint paint)
+            {
+                float x = cx - font.MeasureText(s) * 0.5f;
+                canvas.DrawText(s, x + 1f, y + 1f, font, shadowPaint);
+                canvas.DrawText(s, x, y, font, paint);
             }
+
+            DrawCentered(hwMaxLabel, c1cx, labelY, SKPaints.TextRadarStatusSub);
+            DrawCentered(faultLabel, c2cx, labelY, SKPaints.TextRadarStatusSub);
+            DrawCentered(hwMaxValue, c1cx, valueY, SKPaints.TextRadarStatus);
+            DrawCentered(faultValue, c2cx, valueY, SKPaints.TextRadarStatus);
         }
 
         /// <summary>

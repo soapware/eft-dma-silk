@@ -79,9 +79,13 @@ namespace eft_dma_radar.Silk.UI
         private static long  _waveLastMs = 0;
         private static bool  _waveRussian = false;
         private static readonly Random _waveRng = new();
-        private const  float  WaveSpeed = 0.42f;  // fraction/second (full cycle ~4.8s)
+        private const  float  WaveSpeed = 0.105f; // fraction/second (~quarter of original)
         private static readonly char[] WavePool =
-            ['█', '▓', '▒', '░', '▄', '▀', '▌', '▐', '█', '▓', '▒', '░', '▄', '▀'];
+        [
+            '█','▓','▒','░','▄','▀','▌','▐','▪','▫','▬','■','□',
+            '╬','╪','╫','╤','╧','╦','╩','═','║','╔','╗','╚','╝',
+            '±','×','÷','≈','∞','≡','√','∑','·','•','#','@','%','*','|','~'
+        ];
         private const string RussianGhost = "Ожидание начала рейда";
 
         // Sub-line blinking cursor (independent 2 Hz blink)

@@ -94,6 +94,11 @@ namespace eft_dma_radar.Silk.DMA
         /// </summary>
         public static long PreparedPerSecond => Interlocked.Read(ref _preparedPrevWindow);
 
+        /// <summary>Cumulative count of unexpected game-loop exceptions (DMA/VMM faults).</summary>
+        private static long _faultCount;
+        public static long FaultCount => Interlocked.Read(ref _faultCount);
+        public static void RecordFault() => Interlocked.Increment(ref _faultCount);
+
         /// <summary>
         /// Called once per scatter.Execute() from any thread.
         /// <paramref name="prepareCount"/> is the number of PrepareRead entries that were batched into this trip.

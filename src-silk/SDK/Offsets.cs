@@ -920,18 +920,18 @@ namespace SDK
         }
         public readonly partial struct Special
         {
-            public static ulong TypeInfoTableRva = 0x5ACCD98;
-            public static uint EFTHardSettings_TypeIndex = 225;
-            public static uint GPUInstancerManager_TypeIndex = 4920;
-            public static uint WeatherController_TypeIndex = 10112;
-            public static uint GlobalConfiguration_TypeIndex = 6409;
-            public static uint MatchingProgress_TypeIndex = 15360;
-            public static uint MatchingProgressView_TypeIndex = 15363;
-            public static uint GamePlayerOwner_TypeIndex = 8574;
-            public static uint TarkovApplication_TypeIndex = 7967;
-            public static uint HideoutArea_TypeIndex = 9178;
-            public static uint HideoutController_TypeIndex = 9189;
-            public static uint BtrController_TypeIndex = 0;
+            public static ulong TypeInfoTableRva = 0x6C30EC8;    // updated from cache May 2026
+            public static uint EFTHardSettings_TypeIndex = 226;
+            public static uint GPUInstancerManager_TypeIndex = 4949;
+            public static uint WeatherController_TypeIndex = 10178;
+            public static uint GlobalConfiguration_TypeIndex = 6439;
+            public static uint MatchingProgress_TypeIndex = 15428;
+            public static uint MatchingProgressView_TypeIndex = 15431;
+            public static uint GamePlayerOwner_TypeIndex = 8639;
+            public static uint TarkovApplication_TypeIndex = 8012;
+            public static uint HideoutArea_TypeIndex = 9249;
+            public static uint HideoutController_TypeIndex = 9260;
+            public static uint BtrController_TypeIndex = 12678;
         }
         public readonly partial struct MatchingProgress
         {

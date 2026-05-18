@@ -1345,20 +1345,37 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         {
             try
             {
-                // Primary: LocationId directly from GameWorld
+                // Primary: LocationId string directly from GameWorld
                 if (Memory.TryReadPtr(gameWorld + Offsets.ClientLocalGameWorld.LocationId, out var locationIdPtr, false)
                     && locationIdPtr != 0)
                 {
-                    return Memory.ReadUnityString(locationIdPtr, 64, false);
+                    var s = Memory.ReadUnityString(locationIdPtr, 64, false);
+                    if (!string.IsNullOrEmpty(s)) return s;
                 }
 
-                // Fallback: read Location from MainPlayer
+                // Fallback 1: Location string from MainPlayer
                 if (Memory.TryReadPtr(gameWorld + Offsets.ClientLocalGameWorld.MainPlayer, out var lp, false)
                     && lp != 0
                     && Memory.TryReadPtr(lp + Offsets.Player.Location, out var mapPtr, false)
                     && mapPtr != 0)
                 {
-                    return Memory.ReadUnityString(mapPtr, 64, false);
+                    var s = Memory.ReadUnityString(mapPtr, 64, false);
+                    if (!string.IsNullOrEmpty(s)) return s;
+                }
+
+                // Fallback 2: scan nearby offsets in GameWorld for any recognisable map string
+                for (uint off = 0x80; off <= 0x200; off += 8)
+                {
+                    if (!Memory.TryReadPtr(gameWorld + off, out var p, false) || p == 0) continue;
+                    var s = Memory.ReadUnityString(p, 32, false);
+                    if (string.IsNullOrEmpty(s) || s.Length < 3 || s.Length > 24) continue;
+                    if (!s.All(c => char.IsLetterOrDigit(c) || c == '-' || c == '_')) continue;
+                    if (MapManager.IsKnownMap(s) || s.Equals(HideoutMapID, StringComparison.OrdinalIgnoreCase))
+                    {
+                        Log.WriteRateLimited(AppLogLevel.Info, "mapid_scan", TimeSpan.FromSeconds(30),
+                            $"[ReadMapID] fallback scan found '{s}' at gw+0x{off:X} (LocationId offset may have shifted)");
+                        return s;
+                    }
                 }
             }
             catch { }

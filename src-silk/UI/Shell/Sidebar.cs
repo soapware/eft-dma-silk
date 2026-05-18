@@ -48,7 +48,7 @@ namespace eft_dma_radar.Silk.UI.Shell
 
         private static readonly Item[] _items =
         [
-            new Item("Plyr", "Players", "1",
+            new Item("Players", "Players", "1",
                 static () => PlayerInfoWidget.IsOpen,
                 static () => PlayerInfoWidget.IsOpen = !PlayerInfoWidget.IsOpen),
 
@@ -56,15 +56,15 @@ namespace eft_dma_radar.Silk.UI.Shell
                 static () => LootWidget.IsOpen,
                 static () => LootWidget.IsOpen = !LootWidget.IsOpen),
 
-            new Item("Aim", "Aimview", "3",
+            new Item("Aimview", "Aimview", "3",
                 static () => AimviewWidget.IsOpen,
                 static () => AimviewWidget.IsOpen = !AimviewWidget.IsOpen),
 
-            new Item("Qsts", "Quests",  "4",
+            new Item("Quests", "Quests",  "4",
                 static () => QuestPanel.IsOpen,
                 static () => QuestPanel.IsOpen = !QuestPanel.IsOpen),
 
-            new Item("Sett", "Settings", "5",
+            new Item("Settings", "Settings", "5",
                 static () => SettingsPanel.IsOpen,
                 static () => SettingsPanel.IsOpen = !SettingsPanel.IsOpen),
         ];
@@ -86,11 +86,11 @@ namespace eft_dma_radar.Silk.UI.Shell
                 static () => LootFiltersPanel.IsOpen,
                 static () => LootFiltersPanel.IsOpen = !LootFiltersPanel.IsOpen),
 
-            new Item("Kill", "Killfeed", "",
+            new Item("Killfeed", "Killfeed", "",
                 static () => KillfeedPanel.IsOpen,
                 static () => KillfeedPanel.IsOpen = !KillfeedPanel.IsOpen),
 
-            new Item("Hide", "Hideout", "H",
+            new Item("Hideout", "Hideout", "H",
                 static () => HideoutPanel.IsOpen,
                 static () => HideoutPanel.IsOpen = !HideoutPanel.IsOpen),
 
@@ -102,11 +102,11 @@ namespace eft_dma_radar.Silk.UI.Shell
                 static () => PlayerHistoryPanel.IsOpen,
                 static () => PlayerHistoryPanel.IsOpen = !PlayerHistoryPanel.IsOpen),
 
-            new Item("Wtch", "Watchlist", "",
+            new Item("Watchlist", "Watchlist", "",
                 static () => PlayerWatchlistPanel.IsOpen,
                 static () => PlayerWatchlistPanel.IsOpen = !PlayerWatchlistPanel.IsOpen),
 
-            new Item("Keys", "Hotkeys", "",
+            new Item("Hotkeys", "Hotkeys", "",
                 static () => HotkeyManagerPanel.IsOpen,
                 static () => HotkeyManagerPanel.IsOpen = !HotkeyManagerPanel.IsOpen),
         ];

@@ -15,11 +15,11 @@ namespace eft_dma_radar.Silk.UI
         public static SKFont FontRegular11 { get; } = new(CustomFonts.Regular, 11) { Subpixel = true };
         public static SKFont FontRegular48 { get; } = new(CustomFonts.Regular, 48) { Subpixel = true };
 
-        // ── Cutive Mono — status banners ─────────────────────────────────────
+        // ── Segoe UI — status banners (matches main menu font) ───────────────
         /// <summary>Large banner title on idle/loading screens.</summary>
-        public static SKFont FontBanner { get; } = new(CustomFonts.CutiveMono, 46) { Subpixel = true };
+        public static SKFont FontBanner { get; } = new(CustomFonts.Regular, 46) { Subpixel = true };
         /// <summary>Small sub-line beneath the banner title.</summary>
-        public static SKFont FontBannerSub { get; } = new(CustomFonts.CutiveMono, 14) { Subpixel = true };
+        public static SKFont FontBannerSub { get; } = new(CustomFonts.Regular, 14) { Subpixel = true };
 
         // ── Consolas — info / counter / tooltip ─────────────────────────────
         /// <summary>Player counter overlay and status sub-text.</summary>

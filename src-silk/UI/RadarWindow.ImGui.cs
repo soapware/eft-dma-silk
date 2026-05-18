@@ -538,16 +538,24 @@ namespace eft_dma_radar.Silk.UI
                 int   rtFps    = DMA.DmaStats.RealtimeFps;
                 float mbpsCur  = DMA.DmaStats.ReadMBpsCurrent;
                 float mbpsMax  = DMA.DmaStats.MaxThroughputMBps;
+                float mbpsPeak = DMA.DmaStats.ReadMBpsPeak;
+
+                // Immediate ceiling: use the running peak if HW benchmark hasn't finished
+                float ceiling = Math.Max(mbpsMax, mbpsPeak);
+
                 string dmaSpeed = $"{mbpsCur:F0} MB/s";
                 string dmaTrail = $"  \u00b7  {rtFps} RT";
                 string dmaText  = dmaSpeed + dmaTrail;
 
+                // Red \u2192 yellow \u2192 green gradient based on current vs ceiling
                 Vector4 speedColor;
-                if (mbpsMax <= 0f)
+                if (ceiling <= 0f)
+                {
                     speedColor = ColorDmaStats;
+                }
                 else
                 {
-                    float ratio = Math.Clamp(mbpsCur / mbpsMax, 0f, 1f);
+                    float ratio = Math.Clamp(mbpsCur / ceiling, 0f, 1f);
                     float r = ratio <= 0.5f ? 1.0f : 1.0f - (ratio - 0.5f) * 2f;
                     float g = ratio <= 0.5f ? ratio * 2f : 1.0f;
                     speedColor = new Vector4(r, g, 0.05f, 1.0f);
@@ -580,7 +588,27 @@ namespace eft_dma_radar.Silk.UI
 
                 DrawChip("FPS", fpsText, _fps < 30 ? ColorChipWarn : ColorChipValue);
                 ImGui.SameLine();
-                DrawChip("DMA", dmaSpeed, speedColor, dmaTrail, ColorDmaStats);
+                // DMA chip — inline to apply split gradient coloring reliably
+                {
+                    float cpadX = 10f * UIScale;
+                    float cpadY = 4f * UIScale;
+                    float chipW  = dmaChipW;
+                    float chipH  = 44f * UIScale;
+                    var dl   = ImGui.GetWindowDrawList();
+                    var cp   = ImGui.GetCursorScreenPos();
+                    float cr = 4f * UIScale;
+                    dl.AddRectFilled(cp, new Vector2(cp.X + chipW, cp.Y + chipH), ImGui.GetColorU32(ColorChipBg), cr);
+                    dl.AddRect(cp, new Vector2(cp.X + chipW, cp.Y + chipH), ImGui.GetColorU32(ColorChipBorder), cr);
+                    dl.AddText(new Vector2(cp.X + cpadX, cp.Y + cpadY), ImGui.GetColorU32(ColorChipLabel), "DMA");
+                    float lh = ImGui.GetTextLineHeight();
+                    var vp = new Vector2(cp.X + cpadX, cp.Y + chipH - cpadY - lh);
+                    uint speedU  = ImGui.ColorConvertFloat4ToU32(speedColor);
+                    uint trailU  = ImGui.ColorConvertFloat4ToU32(ColorDmaStats);
+                    dl.AddText(vp, speedU, dmaSpeed);
+                    vp.X += ImGui.CalcTextSize(dmaSpeed).X;
+                    dl.AddText(vp, trailU, dmaTrail);
+                    ImGui.Dummy(new Vector2(chipW, chipH));
+                }
                 ImGui.SameLine();
                 DrawChip("MAP", mapName, ColorChipAccent);
 

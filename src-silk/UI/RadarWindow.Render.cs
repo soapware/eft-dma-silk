@@ -651,40 +651,32 @@ namespace eft_dma_radar.Silk.UI
                 float dt = _waveLastMs == 0 ? 0f : (nowMs - _waveLastMs) / 1000f;
                 _waveLastMs = nowMs;
 
-                if (nowMs >= _wavePauseUntilMs)
-                {
-                    _wavePos += (_waveRight ? WaveSpeed : -WaveSpeed) * dt;
-                    if (_wavePos >= 1f)
-                    {
-                        _wavePos = 1f; _waveRight = false;
-                        _wavePauseUntilMs = nowMs + _waveRng.Next(500, 2500);
-                    }
-                    if (_wavePos <= 0f)
-                    {
-                        _wavePos = 0f; _waveRight = true;
-                        _wavePauseUntilMs = nowMs + _waveRng.Next(500, 2500);
-                    }
-                }
+                _wavePos += (_waveRight ? WaveSpeed : -WaveSpeed) * dt;
+                if (_wavePos >= 1f) { _wavePos = 1f; _waveRight = false; }
+                if (_wavePos <= 0f) { _wavePos = 0f; _waveRight = true;  }
 
-                // 1-in-20 chance to toggle Russian glitch characters in trail
+                // 1-in-20 chance to toggle accented-Latin glitch chars in trail
                 if (_waveRng.Next(20) == 0) _waveRussian = !_waveRussian;
 
-                displayText = (nowMs < _wavePauseUntilMs) ? message : ApplyWave(message, _wavePos, _waveRussian);
+                displayText = ApplyWave(message, _wavePos, _waveRussian);
             }
             else
             {
                 displayText = message;
-                _waveLastMs       = 0;
-                _wavePos          = 0f;
-                _waveRight        = true;
-                _wavePauseUntilMs = 0;
+                _waveLastMs = 0;
+                _wavePos    = 0f;
+                _waveRight  = true;
             }
 
-            // ── Background panel ─────────────────────────────────────────────
-            float panelH = 270f;
-            float panelY = H * 0.5f - panelH * 0.5f;
+            // ── Background panel (contained box sized to content) ────────────
+            var bannerFont  = SKPaints.FontBanner;
+            float textWidth = bannerFont.MeasureText(displayText);
+            float contentW  = Math.Max(textWidth + 120f, 650f);
+            float panelX    = (W - contentW) * 0.5f;
+            float panelH    = 270f;
+            float panelY    = H * 0.5f - panelH * 0.5f;
             using var bgPaint = new SKPaint { Color = new SKColor(0, 0, 0, 175), IsAntialias = false };
-            canvas.DrawRect(new SKRect(0, panelY, W, panelY + panelH), bgPaint);
+            canvas.DrawRect(new SKRect(panelX, panelY, panelX + contentW, panelY + panelH), bgPaint);
             using var borderPaint = new SKPaint
             {
                 Color = new SKColor(255, 0, 245, 80),
@@ -692,11 +684,9 @@ namespace eft_dma_radar.Silk.UI
                 StrokeWidth = 1f,
                 IsAntialias = false
             };
-            canvas.DrawRect(new SKRect(0, panelY, W, panelY + panelH), borderPaint);
+            canvas.DrawRect(new SKRect(panelX, panelY, panelX + contentW, panelY + panelH), borderPaint);
 
             // ── Banner text — Cutive Mono ────────────────────────────────────
-            var bannerFont = SKPaints.FontBanner;
-            float textWidth  = bannerFont.MeasureText(displayText);
             float textX = (W - textWidth) * 0.5f;
             float textY = H * 0.5f + bannerFont.Size * 0.35f;
 
@@ -732,7 +722,7 @@ namespace eft_dma_radar.Silk.UI
                 if (animated && subLine.EndsWith("]"))
                 {
                     bool cursorOn = (_cursorBlinkSw.ElapsedMilliseconds / CursorBlinkMs) % 2 == 0;
-                    char cursor = cursorOn ? '█' : ' ';
+                    char cursor = cursorOn ? 'o' : ' ';
                     subLine = subLine[..^1] + cursor + "]";
                 }
 
@@ -772,8 +762,12 @@ namespace eft_dma_radar.Silk.UI
             var sb = new System.Text.StringBuilder(text);
             int crest = (int)(pos * (text.Length - 1));
 
+            // Fade: wave zone shrinks to 0 within 12% of each edge — smooth start/stop
+            const float fadeEdge = 0.12f;
+            float fade = Math.Clamp(Math.Min(pos / fadeEdge, (1f - pos) / fadeEdge), 0f, 1f);
+
             int leadLen  = Math.Max(1, text.Length / 12);
-            int trailLen = Math.Max(2, text.Length / 4 - leadLen);
+            int trailLen = (int)Math.Round(Math.Max(0, text.Length / 4 - leadLen) * fade);
 
             for (int i = crest; i < Math.Min(crest + leadLen, text.Length); i++)
                 sb[i] = WavePool[_waveRng.Next(WavePool.Length)];

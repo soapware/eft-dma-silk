@@ -89,8 +89,7 @@ namespace eft_dma_radar.Silk.UI
         ];
         // Accented Latin-1 chars — in every Latin font, look suitably alien in ASCII context
         private const string RussianGhost = "ÁÄÅÆÇÐÊËÌÍÏÑÒÓÖØÙÚÜÝÞßàäåæçðêëìíïñòóöøùúüýþ";
-        private static long _wavePauseUntilMs = 0; // ms timestamp until wave resumes after edge pause
-        private static readonly HashSet<int> _cyrillicPositions = new(8); // populated by ApplyWave
+        private static readonly HashSet<int> _cyrillicPositions = new(8); // ghost char positions for red tint
 
         // Sub-line blinking cursor (independent 2 Hz blink)
         private static readonly Stopwatch _cursorBlinkSw = Stopwatch.StartNew();

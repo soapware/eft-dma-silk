@@ -32,14 +32,14 @@ namespace eft_dma_radar.Silk.UI
             // Position on the configured monitor. Do NOT set WindowState in options —
             // GLFW ignores Position when Maximized/Fullscreen is set in options.
             var radarMon = MonitorInfo.GetMonitor(Config.RadarTargetScreen);
-            // Offset 40px from monitor top so the title bar (~30px) is within the monitor.
-            // GLFW positions by client-area top-left; without this offset the title bar
-            // ends up at y = (radarMon.Top - 30) which is above the visible screen.
+            // TitleBarOffset: GLFW positions by client-area top-left; ensure title bar stays on-screen.
             const int TitleBarOffset = 40;
-            options.Position = new Vector2D<int>(radarMon.Left, radarMon.Top + TitleBarOffset);
-            options.Size = new Vector2D<int>(
-                Math.Min(Config.WindowWidth,  radarMon.Width),
-                Math.Min(Config.WindowHeight, radarMon.Height - TitleBarOffset));
+            int winW = Math.Min(Config.WindowWidth,  radarMon.Width);
+            int winH = Math.Min(Config.WindowHeight, radarMon.Height - TitleBarOffset);
+            int centX = radarMon.Left + (radarMon.Width  - winW) / 2;
+            int centY = radarMon.Top  + Math.Max(TitleBarOffset, (radarMon.Height - winH) / 2);
+            options.Position = new Vector2D<int>(centX, centY);
+            options.Size     = new Vector2D<int>(winW, winH);
 
             Log.WriteLine($"[RadarWindow] Creating window on monitor {Config.RadarTargetScreen} ({radarMon.Width}x{radarMon.Height} @ {radarMon.Left},{radarMon.Top})");
 
@@ -66,8 +66,8 @@ namespace eft_dma_radar.Silk.UI
                 _gl = GL.GetApi(_window);
                 Log.WriteLine($"[RadarWindow] OpenGL: {_gl.GetStringS(StringName.Version)}");
 
-                // Set PushPin icon after the window is fully loaded (GLFW requires this)
-                ApplyWindowIcon(_window);
+                // Set window icon after fully loaded (GLFW requires this)
+                ApplyWindowIcon(_window, IconRadar);
 
                 // Create input context FIRST (before ImGuiController)
                 _input = _window.CreateInput();
@@ -225,22 +225,26 @@ namespace eft_dma_radar.Silk.UI
             }
         }
 
+        // ── Per-window icon paths ─────────────────────────────────────────────
+        private const string IconRadar   = @"C:\DMA\eft-dma-radar-silk\src-silk\assets\icons\icon-radar.png";
+        internal const string IconEsp    = @"C:\DMA\eft-dma-radar-silk\src-silk\assets\icons\icon-esp.png";
+        internal const string IconStartup = @"C:\DMA\eft-dma-radar-silk\src-silk\assets\icons\icon-startup.png";
+
         /// <summary>
-        /// Loads the PushPin .ico and applies it to the given window's taskbar + title-bar icon.
-        /// Safe to call before OnLoad (icon is set at the OS level via GLFW).
+        /// Decodes an image file (PNG, ICO, etc.) and applies it as the window's taskbar + title-bar icon.
+        /// SkiaSharp handles any format; GLFW receives raw RGBA pixels.
         /// </summary>
-        internal static void ApplyWindowIcon(IWindow window)
+        internal static void ApplyWindowIcon(IWindow window, string iconPath)
         {
-            const string IconPath = @"C:\DMA\PushPin\source\push-pin.ico";
-            if (!File.Exists(IconPath)) return;
+            if (!File.Exists(iconPath)) return;
             try
             {
-                using var bmp = SKBitmap.Decode(IconPath)?.Copy(SKColorType.Rgba8888);
+                using var bmp = SKBitmap.Decode(iconPath)?.Copy(SKColorType.Rgba8888);
                 if (bmp is null) return;
                 var pixels = new Memory<byte>(bmp.Bytes);
                 window.SetWindowIcon(new ReadOnlySpan<RawImage>(
                     new[] { new RawImage(bmp.Width, bmp.Height, pixels) }));
-                Log.WriteLine($"[RadarWindow] Icon set ({bmp.Width}x{bmp.Height}).");
+                Log.WriteLine($"[RadarWindow] Icon set ({bmp.Width}x{bmp.Height}) from {Path.GetFileName(iconPath)}.");
             }
             catch (Exception ex)
             {

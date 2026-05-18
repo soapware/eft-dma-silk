@@ -138,7 +138,7 @@ namespace eft_dma_radar.Silk.UI.ESP
                 var options = WindowOptions.Default;
                 options.Size     = new Vector2D<int>(espW, espH);
                 options.Position = new Vector2D<int>(espX, espY);
-                options.Title    = "ESP Overlay";
+                options.Title    = "ESP Overlay - (F11 Fullscreen)";
                 options.VSync    = false;
                 options.FramesPerSecond   = Config.EspTargetFps;
                 options.UpdatesPerSecond  = Config.EspTargetFps;
@@ -173,8 +173,8 @@ namespace eft_dma_radar.Silk.UI.ESP
             {
                 _gl = GL.GetApi(_window!);
 
-                // Set PushPin icon after window is loaded (GLFW requires loaded window)
-                RadarWindow.ApplyWindowIcon(_window!);
+                // Set ESP icon after window is loaded (GLFW requires loaded window)
+                RadarWindow.ApplyWindowIcon(_window!, RadarWindow.IconEsp);
 
                 // Register keyboard for F11 fullscreen toggle
                 _input = _window!.CreateInput();

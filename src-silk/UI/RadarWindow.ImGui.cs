@@ -538,9 +538,20 @@ namespace eft_dma_radar.Silk.UI
                 int   rtFps    = DMA.DmaStats.RealtimeFps;
                 float mbpsCur  = DMA.DmaStats.ReadMBpsCurrent;
                 float mbpsMax  = DMA.DmaStats.MaxThroughputMBps;
-                string dmaText = mbpsMax > 0f
-                    ? $"{mbpsCur:F0} MB/s  \u00b7  {rtFps} RT"
-                    : $"{mbpsCur:F0} MB/s  \u00b7  {rtFps} RT";
+                string dmaSpeed = $"{mbpsCur:F0} MB/s";
+                string dmaTrail = $"  \u00b7  {rtFps} RT";
+                string dmaText  = dmaSpeed + dmaTrail;
+
+                Vector4 speedColor;
+                if (mbpsMax <= 0f)
+                    speedColor = ColorDmaStats;
+                else
+                {
+                    float ratio = Math.Clamp(mbpsCur / mbpsMax, 0f, 1f);
+                    float r = ratio <= 0.5f ? 1.0f : 1.0f - (ratio - 0.5f) * 2f;
+                    float g = ratio <= 0.5f ? ratio * 2f : 1.0f;
+                    speedColor = new Vector4(r, g, 0.05f, 1.0f);
+                }
 
                 float fpsChipW = MeasureChipWidth("FPS", fpsText, padX);
                 float dmaChipW = MeasureChipWidth("DMA", dmaText, padX);
@@ -569,7 +580,7 @@ namespace eft_dma_radar.Silk.UI
 
                 DrawChip("FPS", fpsText, _fps < 30 ? ColorChipWarn : ColorChipValue);
                 ImGui.SameLine();
-                DrawChip("DMA", dmaText, ColorDmaStats);
+                DrawChip("DMA", dmaSpeed, speedColor, dmaTrail, ColorDmaStats);
                 ImGui.SameLine();
                 DrawChip("MAP", mapName, ColorChipAccent);
 
@@ -677,6 +688,37 @@ namespace eft_dma_radar.Silk.UI
             drawList.AddText(valuePos, ImGui.GetColorU32(valueColor), value);
 
             // Reserve the layout space so SameLine() works.
+            ImGui.Dummy(new Vector2(chipW, chipH));
+        }
+
+        private static void DrawChip(string label, string value1, Vector4 color1, string value2, Vector4 color2)
+        {
+            float padX = 10f * UIScale;
+            float padY = 4f * UIScale;
+            string combined = value1 + value2;
+            float labelW  = ImGui.CalcTextSize(label).X;
+            float valueW  = ImGui.CalcTextSize(combined).X;
+            float chipW   = Math.Max(labelW, valueW) + padX * 2f;
+            float chipH   = 44f * UIScale;
+
+            var drawList = ImGui.GetWindowDrawList();
+            var pos      = ImGui.GetCursorScreenPos();
+
+            uint bg      = ImGui.GetColorU32(ColorChipBg);
+            uint border  = ImGui.GetColorU32(ColorChipBorder);
+            float rounding = 4f * UIScale;
+            drawList.AddRectFilled(pos, new Vector2(pos.X + chipW, pos.Y + chipH), bg, rounding);
+            drawList.AddRect(pos, new Vector2(pos.X + chipW, pos.Y + chipH), border, rounding);
+
+            drawList.AddText(new Vector2(pos.X + padX, pos.Y + padY),
+                ImGui.GetColorU32(ColorChipLabel), label);
+
+            float lineH = ImGui.GetTextLineHeight();
+            var vp = new Vector2(pos.X + padX, pos.Y + chipH - padY - lineH);
+            drawList.AddText(vp, ImGui.GetColorU32(color1), value1);
+            vp.X += ImGui.CalcTextSize(value1).X;
+            drawList.AddText(vp, ImGui.GetColorU32(color2), value2);
+
             ImGui.Dummy(new Vector2(chipW, chipH));
         }
 

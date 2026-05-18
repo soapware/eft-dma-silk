@@ -20,10 +20,10 @@
   --warn-dim: rgba(250, 204, 21, .15);
   --bad: #f87171;
   --bad-dim: rgba(248, 113, 113, .15);
-  /* Single accent — matches the desktop client's cyan focus / "on" state. */
-  --accent: #34d4d4;
-  --accent-dim: rgba(52, 212, 212, .18);
-  --accent-soft: rgba(52, 212, 212, .35);
+  /* Single accent — matches the desktop client's magenta focus / "on" state. */
+  --accent: #ff00f5;
+  --accent-dim: rgba(255, 0, 245, .18);
+  --accent-soft: rgba(255, 0, 245, .35);
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;

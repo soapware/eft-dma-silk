@@ -114,9 +114,9 @@ namespace eft_dma_radar.Silk.UI.Panels
 
                     if (active)
                     {
-                        ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.20f, 0.45f, 0.45f, 1f));
-                        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.25f, 0.55f, 0.55f, 1f));
-                        ImGui.PushStyleColor(ImGuiCol.ButtonActive, new Vector4(0.30f, 0.65f, 0.65f, 1f));
+                        ImGui.PushStyleColor(ImGuiCol.Button,        new Vector4(0.55f, 0.00f, 0.53f, 1f));
+                        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.70f, 0.00f, 0.67f, 1f));
+                        ImGui.PushStyleColor(ImGuiCol.ButtonActive,  new Vector4(1.00f, 0.00f, 0.961f, 1f));
                     }
                     else
                     {

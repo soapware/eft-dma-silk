@@ -668,13 +668,21 @@ namespace eft_dma_radar.Silk.UI
                 _waveRight  = true;
             }
 
-            // ── Background panel (contained box sized to content) ────────────
+            // ── Background panel (contained box, symmetric padding) ──────────
             var bannerFont  = SKPaints.FontBanner;
             float textWidth = bannerFont.MeasureText(displayText);
             float contentW  = Math.Max(textWidth + 120f, 650f);
             float panelX    = (W - contentW) * 0.5f;
-            float panelH    = 270f;
-            float panelY    = H * 0.5f - panelH * 0.5f;
+
+            // Pre-compute content boundaries so top/bottom padding are identical
+            float textY_    = H * 0.5f + bannerFont.Size * 0.35f;
+            float textTop_  = textY_ - bannerFont.Size;          // approx glyph top
+            float subY_     = textY_ + bannerFont.Size * 0.55f + 6f;
+            float boxTopY_  = subY_  + SKPaints.FontBannerSub.Size * 1.8f;
+            float boxH_     = (SKPaints.FontBannerSub.Size + 5f) * 2f + 2f;
+            const float panelPad = 30f;
+            float panelH = (boxTopY_ + boxH_ - textTop_) + panelPad * 2f;
+            float panelY = textTop_ - panelPad;
             using var bgPaint = new SKPaint { Color = new SKColor(0, 0, 0, 175), IsAntialias = false };
             canvas.DrawRect(new SKRect(panelX, panelY, panelX + contentW, panelY + panelH), bgPaint);
             using var borderPaint = new SKPaint

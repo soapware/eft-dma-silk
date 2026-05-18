@@ -159,9 +159,9 @@ namespace eft_dma_radar.Silk.UI.Panels
             && Config.QuestHighlightLootItems
             && !Config.LootShowMeds && !Config.LootShowFood && !Config.LootShowBackpacks && !Config.LootShowKeys;
 
-        private static readonly Vector4 _quickChipOnBg     = new(0.20f, 0.55f, 0.55f, 1f);
-        private static readonly Vector4 _quickChipOnHover  = new(0.28f, 0.65f, 0.65f, 1f);
-        private static readonly Vector4 _quickChipOnActive = new(0.18f, 0.48f, 0.48f, 1f);
+        private static readonly Vector4 _quickChipOnBg     = new(0.55f, 0.00f, 0.53f, 1f);
+        private static readonly Vector4 _quickChipOnHover  = new(0.70f, 0.00f, 0.67f, 1f);
+        private static readonly Vector4 _quickChipOnActive = new(1.00f, 0.00f, 0.961f, 1f);
 
         private static bool DrawQuickChip(string label, string tooltip, Vector2 size, bool isActive)
         {

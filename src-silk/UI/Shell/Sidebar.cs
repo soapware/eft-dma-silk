@@ -160,6 +160,10 @@ namespace eft_dma_radar.Silk.UI.Shell
                 float btnH = 44f * cfg.UIScale;
                 float btnW = width;
 
+                // Primary tab titles render at 15px (2pt larger than default 13px)
+                bool _bigFont = RadarWindow._imguiTopBarFont.IsLoaded();
+                if (_bigFont) ImGui.PushFont(RadarWindow._imguiTopBarFont);
+
                 foreach (var item in _items)
                 {
                     bool active = item.IsActive();
@@ -200,6 +204,8 @@ namespace eft_dma_radar.Silk.UI.Shell
 
                     ImGui.PopID();
                 }
+
+                if (_bigFont) ImGui.PopFont();
 
                 // ── Secondary slots ─────────────────────────────────────────
                 // Smaller buttons for less-frequently-used panels (Loot

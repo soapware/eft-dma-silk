@@ -69,6 +69,7 @@ namespace eft_dma_radar.Silk.DMA
         public static bool Ready => _state is MemoryState.ProcessFound or MemoryState.InRaid or MemoryState.InHideout;
         public static bool InRaid => _state is MemoryState.InRaid;
         public static bool InHideout => _state is MemoryState.InHideout;
+        public static bool WaitingForTarkov => _state is MemoryState.WaitingForProcess;
 
         /// <summary>Hideout manager instance — persists across hideout entries.</summary>
         public static HideoutManager Hideout { get; } = new();

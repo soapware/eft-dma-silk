@@ -268,6 +268,10 @@ namespace eft_dma_radar.Silk.UI
             // Chunky pill rounding for the modern command-bar look.
             ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 6f);
 
+            // Larger font for pill buttons — easier to read
+            bool _topBarFontPushed = _imguiTopBarFont.IsLoaded();
+            if (_topBarFontPushed) ImGui.PushFont(_imguiTopBarFont);
+
             // ── Mode toggle (Follow / Free) ─────────────────────────────────
             DrawFollowFreePill();
             ImGui.SameLine(0, 6);
@@ -325,6 +329,8 @@ namespace eft_dma_radar.Silk.UI
 
             // ── More overflow popup ─────────────────────────────────────────
             DrawMorePopup();
+
+            if (_topBarFontPushed) ImGui.PopFont();
 
             // ── Right-aligned info chip (Map  ·  FPS) ──────────────────
             DrawTopBarRightInfo();
@@ -940,6 +946,31 @@ namespace eft_dma_radar.Silk.UI
             else
             {
                 Log.WriteLine("[RadarWindow] WARNING: seguisym.ttf not found, icons may render as '?'.");
+            }
+
+            // Top-bar font: Segoe UI 15px + symbol glyphs — used for pill buttons only
+            if (File.Exists(segoeUiPath))
+            {
+                unsafe
+                {
+                    _imguiTopBarFont = io.Fonts.AddFontFromFileTTF(
+                        segoeUiPath,
+                        15.0f,
+                        new ImFontConfigPtr((ImFontConfig*)null),
+                        _cyrillicGlyphRangesHandle.AddrOfPinnedObject());
+                }
+                if (File.Exists(symbolFontPath) && _iconGlyphRangesHandle.IsAllocated)
+                {
+                    var mc = ImGuiNative.ImFontConfig_ImFontConfig();
+                    mc->MergeMode = 1;
+                    mc->FontDataOwnedByAtlas = 1;
+                    io.Fonts.AddFontFromFileTTF(
+                        symbolFontPath, 15.0f,
+                        new ImFontConfigPtr(mc),
+                        _iconGlyphRangesHandle.AddrOfPinnedObject());
+                    ImGuiNative.ImFontConfig_destroy(mc);
+                }
+                Log.WriteLine("[RadarWindow] Top-bar font loaded (15px Segoe UI).");
             }
         }
 

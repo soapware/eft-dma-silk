@@ -37,6 +37,7 @@ namespace eft_dma_radar.Silk.UI
         private static GRContext _grContext = null!;
         private static GRBackendRenderTarget _skBackendRenderTarget = null!;
         private static ImGuiController _imgui = null!;
+        private static ImFontPtr _imguiTopBarFont; // 15px font for top-bar pills
 
         // FPS tracking
         private static int _fpsCounter;

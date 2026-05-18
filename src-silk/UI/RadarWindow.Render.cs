@@ -98,7 +98,8 @@ namespace eft_dma_radar.Silk.UI
                 }
                 else if (!Ready)
                 {
-                    DrawStatusMessage(canvas, "Starting Up", scale, animated: true);
+                    var msg = Memory.WaitingForTarkov ? "Waiting for Tarkov" : "Starting Up";
+                    DrawStatusMessage(canvas, msg, scale, animated: true);
                 }
                 else if (!InRaid)
                 {
@@ -751,6 +752,8 @@ namespace eft_dma_radar.Silk.UI
 
         private static string GetStatusSubLine(string message, bool animated)
         {
+            if (message.StartsWith("Waiting for Tarkov", StringComparison.Ordinal))
+                return "[ WAITING FOR TARKOV ]";
             if (message.StartsWith("Starting", StringComparison.Ordinal))
                 return "[ INITIALIZING DMA INTERFACE ]";
             if (message.StartsWith("Waiting", StringComparison.Ordinal))

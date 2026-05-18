@@ -4,6 +4,7 @@
         <OutputType>Exe</OutputType>
         <AssemblyName>eft-dma-radar</AssemblyName>
         <RootNamespace>eft_dma_radar.Silk</RootNamespace>
+        <ApplicationIcon>assets\icons\icon-radar.ico</ApplicationIcon>
         <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
         <ServerGarbageCollection>true</ServerGarbageCollection>
         <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>

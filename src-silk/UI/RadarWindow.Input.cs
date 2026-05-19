@@ -241,6 +241,11 @@ namespace eft_dma_radar.Silk.UI
             }
             Config.RadarFullscreen = _fakeFullscreen;
             Config.MarkDirty();
+
+            // GLFW can hide the cursor when a borderless window fills the screen —
+            // force it back to Normal so the cursor remains visible in fake fullscreen.
+            foreach (var mouse in _input.Mice)
+                mouse.Cursor.CursorMode = CursorMode.Normal;
         }
 
         private static void OnKeyDown(IKeyboard keyboard, Key key, int scancode)

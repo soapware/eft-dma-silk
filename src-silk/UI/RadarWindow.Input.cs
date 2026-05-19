@@ -187,14 +187,10 @@ namespace eft_dma_radar.Silk.UI
 
         private static void OnMouseScroll(IMouse mouse, ScrollWheel scroll)
         {
-            var io = ImGui.GetIO();
-            if (io.WantCaptureMouse)
-            {
-                // ImGui has focus — forward scroll and skip map zoom
-                io.MouseWheel  += scroll.Y;
-                io.MouseWheelH += scroll.X;
+            // ImGuiController handles scroll forwarding to io.MouseWheel internally.
+            // We only need to skip map zoom when ImGui has focus.
+            if (ImGui.GetIO().WantCaptureMouse)
                 return;
-            }
 
             if (!InRaid)
                 return;

@@ -1,49 +1,59 @@
-# EFT DMA Radar — Silk.NET Edition (soapware fork)
+# EFT (Silk.NET) — soapware fork
 
 A DMA radar overlay for **Escape from Tarkov** built on [Silk.NET](https://github.com/dotnet/Silk.NET), [ImGui.NET](https://github.com/ImGuiNET/ImGui.NET), and [SkiaSharp](https://github.com/mono/SkiaSharp). Ships with an embedded ASP.NET Core web radar.
 
-> **Based on [eft-dma-radar-silk](https://github.com/HuiTeab/eft-dma-radar-silk) by [HuiTeab](https://github.com/HuiTeab).** Original work © HuiTeab, licensed under the PolyForm Noncommercial License 1.0.0. This fork extends the original with the additions listed below.
+> **Fork of [eft-dma-radar-silk](https://github.com/HuiTeab/eft-dma-radar-silk) by [HuiTeab](https://github.com/HuiTeab).** Original work © HuiTeab, PolyForm Noncommercial License 1.0.0.
+
+See **[SETUP.md](SETUP.md)** for the full build, configuration, and launch guide.
 
 ---
-### QOL fork
 
-### Status Screen
+## What's in this fork
 
-- **State-aware messaging** — startup sub-line reads `[ INITIALIZING DMA INTERFACE ]` while the DMA card is connecting, then switches to `[ WAITING FOR TARKOV ]` once the card is live and the radar is polling for the game process.
-- **DMA stats box** — Skia-drawn box below the banner shows live read throughput (MB/s) with a red→yellow→green gradient and a cumulative fault counter for the session.
+### ESP Visuals Customization
 
-### Status Bar
+A dedicated **ESP Visuals** panel (sidebar → Visuals) gives per-feature control over the overlay:
 
-- **DMA speed gradient** — the `### MB/s` value in the DMA chip colors red → yellow → green based on current throughput relative to the hardware ceiling. The separator and RT count stay neutral blue.
-
-### Quality of Life
-
-- **Window position memory** — radar and ESP windows remember their last position and monitor across sessions; positions are restored automatically on next launch.
-- **UI scale live** — adjusting `UIScale` in Settings takes effect immediately with no restart required.
-- **Panel scroll** — mouse wheel correctly routes to focused ImGui panels instead of always zooming the radar map.
-- **Stash refresh** — the Hideout stash refresh button is now gated to when the player is actually in the hideout, preventing silent failures from the main menu.
+- **Feature toggles** — name label, health bar, weapon name, distance label, highlight target, each individually switchable
+- **Per-feature color pickers** — inline color swatches with a full RGBA picker for every element
+- **Box styles** — Corners, Full rectangle, or Top+Bottom bars, with a corner-fraction slider and line-thickness slider
+- **ESP window opacity** — a single slider (10–100%) dims the entire overlay window via the OS layered-window API
+- **Name font selector** — switch between Regular, Consolas, and Cutive Mono for player name labels
+- **Health color thresholds** — independently configure the high / mid / low health bar colors
 
 ### Key Door Blips
 
-Scans the local player's Pockets, Backpack, and SecuredContainer for key items on raid entry and again whenever item counts change (pickup/drop), with a 60-second safety refresh. Uses batched DMA scatter reads
+Scans the local player's inventory on raid entry and again whenever items are picked up or dropped (event-driven, not a fixed timer). Locked doors for which the player holds the required key are highlighted **cyan** on the radar map and marked with a labeled world-space indicator in the ESP overlay. Toggle in **Settings → Map → Doors → Highlight Key Doors**.
 
-- Locked doors for which the player holds the required key are highlighted **cyan** on the radar map instead of red.
-- The ESP overlay shows a cyan circle marker and `"KeyName [Xm]"` world-space label for each matching door.
-- Toggle: **Settings → Map → Doors → Highlight Key Doors**, or `showKeyDoors` in `config.json`.
+### Startup Console
 
-### Setup Guide
+The debug console is replaced with a clean status panel showing each startup phase:
 
-`SETUP.md` at the repo root — plain-language step-by-step instructions for configuring, building, launching, and understanding the three startup states.
+- **DMA connection** — attempt lines shift green → yellow → orange → red as retries mount, with actionable hint text at each threshold
+- **DMA stats** — hardware benchmark speed shown immediately on connect, transitions to live read speed once scatter reads begin; both use the same red→yellow→green gradient
+- **Wave animation** — the status-screen wave speed is linked to DMA throughput so card performance is visible at a glance
+- **Error handling** — failure messages print once, then cycle a blinking dot in-place instead of flooding the console
+
+### Persistent Window State
+
+Both the radar and ESP overlay windows remember their last position, monitor, size, and F11 fullscreen state across sessions. Windows open exactly where they were left.
+
+### UI & Visual Polish
+
+- **Magenta accent** (`#ff00f5`) replaces the original teal throughout buttons, chips, and the web radar
+- **Cutive Mono font** for status banners and the DMA stats box
+- **Custom per-window icons** embedded in the exe and applied to the radar, ESP overlay, and startup screen
+- **DMA speed gradient** on the status bar chip — the MB/s readout colors red→yellow→green relative to the hardware ceiling
+- **Sidebar labels** use full readable names (Filter, History, Visuals, etc.)
 
 ---
 
 ## Requirements
 
 - **DMA hardware** supported by [MemProcFS](https://github.com/ufrisk/MemProcFS) (FPGA card, `usb3380`, etc.)
-- **Windows 10 / 11 (x64)** — project targets `net10.0-windows`, `PlatformTarget=x64`
-- **[.NET 10 SDK / Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)**
-- Run as **Administrator** (required for DMA device access)
-- Native MemProcFS binaries (`vmm.dll`, `leechcore.dll`, `FTD3XX.dll`, …) are copied to the build output automatically from `lib/VmmSharpEx/native/`.
+- **Windows 10 / 11 (x64)** — targets `net10.0-windows`, `PlatformTarget=x64`
+- **[.NET 10 Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)**
+- Run as **Administrator** (DMA device access requires elevation)
 
 ---
 
@@ -52,48 +62,23 @@ Scans the local player's Pockets, Backpack, and SecuredContainer for key items o
 ```powershell
 git clone https://github.com/soapware/eft-dma-silk.git
 cd eft-dma-silk
-
-# Build (Release, x64)
 dotnet build eft-dma-radar-silk.sln -c Release
-
-# Run as Administrator
 dotnet run --project src-silk\eft-dma-radar.csproj -c Release
 ```
 
-See **[SETUP.md](SETUP.md)** for the full configuration and launch walkthrough.
-
-Pass `-debug` on the command line for verbose startup logging.
-
----
-
-## Repo Layout
-
-```
-eft-dma-radar-silk/
-├── eft-dma-radar-silk.sln       # Visual Studio solution
-├── SETUP.md                     # Quick-start guide (this fork)
-├── Maps/                        # EFT map SVGs + JSON metadata
-├── Resources/                   # Embedded font + default item DB
-├── lib/
-│   └── VmmSharpEx/              # Managed MemProcFS wrapper + native DLLs
-└── src-silk/                    # Radar source (entry: Program.cs → SilkProgram.Main)
-    └── assets/
-        ├── fonts/               # Cutive Mono, Segoe UI (ImGui)
-        └── icons/               # Per-window PNG + ICO icons
-```
+Pass `-debug` for verbose startup logging.
 
 ---
 
 ## License
 
-The source code in `src-silk/` is licensed under the **[PolyForm Noncommercial License 1.0.0](LICENSE)** — personal / non-commercial use only.
-
-The component under `lib/VmmSharpEx/` is licensed under **AGPL-3.0** (original MemProcFS wrapper © Ulf Frisk; modifications © Lone DMA, 2025). Redistributors of compiled binaries must satisfy AGPL-3.0 requirements.
+`src-silk/` — **PolyForm Noncommercial License 1.0.0** (personal / non-commercial use only).  
+`lib/VmmSharpEx/` — **AGPL-3.0** (MemProcFS wrapper © Ulf Frisk; modifications © Lone DMA, 2025).
 
 ---
 
 ## Credits
 
-- Original radar: **[HuiTeab](https://github.com/HuiTeab)** — [eft-dma-radar-silk](https://github.com/HuiTeab/eft-dma-radar-silk)
-- MemProcFS: **Ulf Frisk** — [https://github.com/ufrisk/MemProcFS](https://github.com/ufrisk/MemProcFS)
+- Original: **[HuiTeab](https://github.com/HuiTeab)** — [eft-dma-radar-silk](https://github.com/HuiTeab/eft-dma-radar-silk)
+- MemProcFS: **Ulf Frisk** — [github.com/ufrisk/MemProcFS](https://github.com/ufrisk/MemProcFS)
 - Reference data: [tarkov.dev](https://tarkov.dev/)

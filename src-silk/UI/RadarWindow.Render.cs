@@ -804,9 +804,15 @@ namespace eft_dma_radar.Silk.UI
             const float padY = 5f;
             float lineH = font.Size + padY * 2f;
 
-            float  mbpsCur    = DMA.DmaStats.ReadMBpsCurrent;
-            string hwMaxLabel = "READ";
-            string hwMaxValue = $"{mbpsCur:F0} MB/s";
+            float mbpsCur   = DMA.DmaStats.ReadMBpsCurrent;
+            float mbpsBench = DMA.DmaStats.MaxThroughputMBps;
+
+            // Before scatter reads start, fall back to the boot benchmark value
+            bool  showingLive = mbpsCur > 0f;
+            float displayVal  = showingLive ? mbpsCur : mbpsBench;
+
+            string hwMaxLabel = showingLive ? "READ" : "BENCH";
+            string hwMaxValue = $"{displayVal:F0} MB/s";
             string faultLabel = "FAULTS";
             string faultValue = $"{DMA.DmaStats.FaultCount}";
 
@@ -843,12 +849,12 @@ namespace eft_dma_radar.Silk.UI
                 canvas.DrawText(s, x, y, font, paint);
             }
 
-            // Gradient color for the live read value — red→yellow→green
-            float   ceiling = Math.Max(DMA.DmaStats.MaxThroughputMBps, DMA.DmaStats.ReadMBpsPeak);
+            // Gradient only for live scatter reads; benchmark fallback uses neutral color
+            float   ceiling = Math.Max(mbpsBench, DMA.DmaStats.ReadMBpsPeak);
             SKColor speedColor;
-            if (ceiling <= 0f || mbpsCur <= 0f)
+            if (!showingLive || ceiling <= 0f)
             {
-                speedColor = SKPaints.TextRadarStatus.Color; // neutral during startup / no reads yet
+                speedColor = SKPaints.TextRadarStatus.Color;
             }
             else
             {

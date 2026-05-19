@@ -139,7 +139,7 @@ namespace eft_dma_radar.Silk.UI.ESP
                 var options = WindowOptions.Default;
                 options.Size     = new Vector2D<int>(espW, espH);
                 options.Position = new Vector2D<int>(espX, espY);
-                options.Title    = "ESP Overlay - (F11 Fullscreen)";
+                options.Title    = "ESP Overlay  [F11 Fullscreen]";
                 options.VSync    = false;
                 options.FramesPerSecond   = Config.EspTargetFps;
                 options.UpdatesPerSecond  = Config.EspTargetFps;

@@ -196,7 +196,10 @@ namespace eft_dma_radar.Silk.DMA
             var vmmVer = FileVersionInfo.GetVersionInfo(Path.Combine(AppContext.BaseDirectory, "vmm.dll")).FileVersion;
             var lcVer = FileVersionInfo.GetVersionInfo(Path.Combine(AppContext.BaseDirectory, "leechcore.dll")).FileVersion;
 
-            var args = new List<string>(["-printf", "-v", "-device", config.DeviceStr, "-waitinitialize"]);
+            // In CleanMode suppress native vmm.dll printf so "DEVICE: FPGA: ERROR..." lines don't appear
+            var args = new List<string>(["-device", config.DeviceStr, "-waitinitialize"]);
+            if (!Log.CleanMode)
+                args.InsertRange(0, ["-printf", "-v"]);
 
             try
             {

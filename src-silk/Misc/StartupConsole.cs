@@ -19,8 +19,8 @@ namespace eft_dma_radar.Silk.Misc
         // ── Attempt hint thresholds ──────────────────────────────────────────────
         private static readonly (int MinAttempt, string Hint)[] Hints =
         [
-            (3,  "Try replugging the USB cable from the DMA card"),
-            (6,  "Check PCIe slot — card may not be fully seated"),
+            (3,  "Try unplugging and replugging the USB cable from the DMA card if this error persists"),
+            (6,  "Make sure the card is properly seated in the PCIe slot"),
             (10, "Verify 'deviceStr' in config.json matches your card type"),
         ];
 
@@ -102,7 +102,7 @@ namespace eft_dma_radar.Silk.Misc
             // Print hint on a second line when threshold is crossed
             string? hint = null;
             foreach (var (min, h) in Hints)
-                if (attempt == min) { hint = h; break; }
+                if (attempt == min) { hint = h; break; } // show hint on first tick at each threshold
 
             if (hint is not null)
             {

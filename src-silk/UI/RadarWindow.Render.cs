@@ -846,9 +846,9 @@ namespace eft_dma_radar.Silk.UI
             // Gradient color for the live read value — red→yellow→green
             float   ceiling = Math.Max(DMA.DmaStats.MaxThroughputMBps, DMA.DmaStats.ReadMBpsPeak);
             SKColor speedColor;
-            if (ceiling <= 0f)
+            if (ceiling <= 0f || mbpsCur <= 0f)
             {
-                speedColor = SKPaints.TextRadarStatus.Color;
+                speedColor = SKPaints.TextRadarStatus.Color; // neutral during startup / no reads yet
             }
             else
             {

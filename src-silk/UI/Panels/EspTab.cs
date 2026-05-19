@@ -52,6 +52,8 @@ namespace eft_dma_radar.Silk.UI.Panels
                 "Which monitor the ESP window opens on.\nUse 'Move ESP to Monitor' to reposition a running window."))
             {
                 Config.EspTargetScreen = targetScreen;
+                Config.EspWindowX = -1; // discard saved position so new monitor takes effect on next launch
+                Config.EspWindowY = -1;
                 Config.MarkDirty();
             }
 

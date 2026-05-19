@@ -11,6 +11,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
     internal sealed class LootItem(TarkovMarketItem item, Vector3 position)
     {
         private readonly TarkovMarketItem _item = item;
+        private readonly bool _isMeds = item.IsMeds; // cached — HasCategory iterates strings, not free per-frame
 
         /// <summary>
         /// True when this is a loose quest item (ItemTemplate.QuestItem flag) such as
@@ -91,9 +92,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         /// </summary>
         public void Draw(SKCanvas canvas, SKPoint screenPos, int price, LootFilter.FilterResult result, bool differentFloor = false, float heightDelta = 0f)
         {
-            var paint = GetPaint(result, differentFloor, price);
-
             var cfg = SilkProgram.Config;
+            var paint = GetPaint(result, differentFloor, price, cfg);
             float baseR = Math.Clamp(cfg.LootDotSize, 1.5f, 8f);
             // Tier-based size: base + smaller per-tier bump. Different-floor dots stay compact.
             float radius = differentFloor
@@ -198,10 +198,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
             path.Close();
         }
 
-        private SKPaint GetPaint(LootFilter.FilterResult result, bool differentFloor, int price)
+        private SKPaint GetPaint(LootFilter.FilterResult result, bool differentFloor, int price, SilkConfig config)
         {
-            var config = SilkProgram.Config;
-            bool isMed = config.LootMedsRedTint && result.CategoryMatch && _item.IsMeds;
+            bool isMed = config.LootMedsRedTint && result.CategoryMatch && _isMeds;
 
             // Price gradient: brightness scales with value (wishlisted items keep cyan)
             if (config.LootPriceGradient && !result.Wishlisted)

@@ -2,6 +2,7 @@
 // Licensed under the PolyForm Noncommercial License 1.0.0.
 // See LICENSE in the repository root for details.
 
+using System.Runtime.InteropServices;
 using Silk.NET.Core;
 using Silk.NET.Input;
 using Silk.NET.Maths;
@@ -145,14 +146,17 @@ namespace eft_dma_radar.Silk.UI
                 // Clear any CursorMode.Hidden GLFW stored from a previous ImGui frame.
                 foreach (var mouse in _input.Mice)
                     mouse.Cursor.CursorMode = CursorMode.Normal;
+                ForceShowCursor(); // counteract any OBS game-capture ShowCursor(false) at startup
 
                 // Re-assert Normal on focus gain — GLFW re-applies its stored cursor mode
                 // when the window regains focus, so this fires before the next render frame.
+                // Also counteracts OBS game-capture hiding the cursor when focus returns.
                 _window.FocusChanged += isFocused =>
                 {
                     if (!isFocused) return;
                     foreach (var mouse in _input.Mice)
                         mouse.Cursor.CursorMode = CursorMode.Normal;
+                    ForceShowCursor();
                 };
 
                 _window.Render += OnRender;
@@ -273,5 +277,17 @@ namespace eft_dma_radar.Silk.UI
                 Log.WriteLine($"[RadarWindow] Icon load failed: {ex.Message}");
             }
         }
+
+        /// <summary>
+        /// Increments the Windows cursor display counter until the cursor is visible (counter ≥ 0).
+        /// OBS game-capture decrements the counter via ShowCursor(false); this counteracts it.
+        /// </summary>
+        private static void ForceShowCursor()
+        {
+            while (ShowCursorNative(true) < 0) { }
+        }
+
+        [DllImport("user32.dll", EntryPoint = "ShowCursor")]
+        private static extern int ShowCursorNative(bool bShow);
     }
 }

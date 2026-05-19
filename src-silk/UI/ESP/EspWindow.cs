@@ -293,6 +293,27 @@ namespace eft_dma_radar.Silk.UI.ESP
                 Config.EspWindowX      = _window.Position.X;
                 Config.EspWindowY      = _window.Position.Y;
             }
+
+            // Derive which monitor the ESP was on and keep EspTargetScreen in sync
+            {
+                int saveX = _fakeFullscreen ? _savedFsPos.X  : (_window?.Position.X ?? 0);
+                int saveY = _fakeFullscreen ? _savedFsPos.Y  : (_window?.Position.Y ?? 0);
+                int saveW = _fakeFullscreen ? _savedFsSize.X : (_window?.Size.X     ?? 0);
+                int saveH = _fakeFullscreen ? _savedFsSize.Y : (_window?.Size.Y     ?? 0);
+                int ecx = saveX + saveW / 2;
+                int ecy = saveY + saveH / 2;
+                var allMons = MonitorInfo.GetAllMonitors();
+                for (int i = 0; i < allMons.Count; i++)
+                {
+                    var m = allMons[i];
+                    if (ecx >= m.Left && ecx < m.Left + m.Width && ecy >= m.Top && ecy < m.Top + m.Height)
+                    {
+                        Config.EspTargetScreen = i;
+                        break;
+                    }
+                }
+            }
+
             Config.MarkDirty();
 
             _input?.Dispose();

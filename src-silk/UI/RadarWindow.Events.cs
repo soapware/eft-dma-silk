@@ -37,6 +37,26 @@ namespace eft_dma_radar.Silk.UI
                 Config.RadarWindowY = _window.Position.Y;
             }
 
+            // Derive which monitor the radar was on and keep RadarTargetScreen in sync
+            {
+                int saveX = _fakeFullscreen ? _savedFsPos.X : _window.Position.X;
+                int saveY = _fakeFullscreen ? _savedFsPos.Y : _window.Position.Y;
+                int saveW = _fakeFullscreen ? _savedFsSize.X : _window.Size.X;
+                int saveH = _fakeFullscreen ? _savedFsSize.Y : _window.Size.Y;
+                int cx = saveX + saveW / 2;
+                int cy = saveY + saveH / 2;
+                var allMons = MonitorInfo.GetAllMonitors();
+                for (int i = 0; i < allMons.Count; i++)
+                {
+                    var m = allMons[i];
+                    if (cx >= m.Left && cx < m.Left + m.Width && cy >= m.Top && cy < m.Top + m.Height)
+                    {
+                        Config.RadarTargetScreen = i;
+                        break;
+                    }
+                }
+            }
+
             // Persist widget/panel visibility
             Config.ShowPlayersWidget = PlayerInfoWidget.IsOpen;
             Config.ShowLootWidget = LootWidget.IsOpen;

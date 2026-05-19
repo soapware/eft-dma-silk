@@ -134,7 +134,7 @@ namespace eft_dma_radar.Silk.UI.Panels
             ImGui.TextUnformatted(label);
             Tip(tip);
 
-            ImGui.SameLine(ImGui.GetContentRegionMax().X - swatchSz);
+            ImGui.SameLine(ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X - swatchSz);
             if (ColorSwatch("##c" + label, ref color, label + " color")) changed = true;
 
             return changed;
@@ -149,7 +149,7 @@ namespace eft_dma_radar.Silk.UI.Panels
             ImGui.PopStyleColor();
             Tip(tip);
 
-            ImGui.SameLine(ImGui.GetContentRegionMax().X - swatchSz);
+            ImGui.SameLine(ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X - swatchSz);
             return ColorSwatch("##co" + label, ref color, tip);
         }
 

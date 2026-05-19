@@ -50,10 +50,10 @@ Both the radar and ESP overlay windows remember their last position, monitor, si
 
 ## Requirements
 
-- **DMA hardware** supported by [MemProcFS](https://github.com/ufrisk/MemProcFS) (FPGA card, `usb3380`, etc.)
-- **Windows 10 / 11 (x64)** — targets `net10.0-windows`, `PlatformTarget=x64`
+- **ACTUAL DMA HARDWARE** supported by [MemProcFS](https://github.com/ufrisk/MemProcFS) (FPGA card, `usb3380`, etc.)
+- **Either Windows 10 / 11 (x64)** 
 - **[.NET 10 Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)**
-- Run as **Administrator** (DMA device access requires elevation)
+- Running applications as **Administrator** (requires elevation for DMA access)
 
 ---
 
@@ -66,7 +66,7 @@ dotnet build eft-dma-radar-silk.sln -c Release
 dotnet run --project src-silk\eft-dma-radar.csproj -c Release
 ```
 
-Pass `-debug` for verbose startup logging.
+Use `-debug` for verbose startup logging
 
 ---
 

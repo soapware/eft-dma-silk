@@ -94,7 +94,7 @@ namespace eft_dma_radar.Silk.UI.Shell
                 static () => HideoutPanel.IsOpen,
                 static () => HideoutPanel.IsOpen = !HideoutPanel.IsOpen),
 
-            new Item("QPln", "Quest Planner", "",
+            new Item("Qplan", "Quest Planner", "",
                 static () => QuestPlannerPanel.IsOpen,
                 static () => QuestPlannerPanel.IsOpen = !QuestPlannerPanel.IsOpen),
 

@@ -16,6 +16,9 @@ namespace eft_dma_radar.Silk.UI.Panels
         private static readonly IReadOnlyList<string> _fontNames =
             ["Regular (12 px)", "Consolas (11 px)", "Cutive Mono (14 px)"];
 
+        private static readonly IReadOnlyList<string> _boxStyles =
+            ["Corners", "Full", "Top + Bottom"];
+
         private static SilkConfig Config => SilkProgram.Config;
         private static float UIScale => Config.UIScale;
 
@@ -29,14 +32,16 @@ namespace eft_dma_radar.Silk.UI.Panels
         public static void Draw()
         {
             bool isOpen = IsOpen;
-            using var scope = PanelWindow.Begin("ESP Visuals", ref isOpen, new Vector2(480, 460));
+            using var scope = PanelWindow.Begin("ESP Visuals", ref isOpen, new Vector2(480, 520));
             IsOpen = isOpen;
             if (!scope.Visible) return;
 
             if (ImGui.BeginTabBar("##espvis-tabs"))
             {
                 if (ImGui.BeginTabItem("Players"))    { DrawPlayersTab();    ImGui.EndTabItem(); }
+                if (ImGui.BeginTabItem("Box"))        { DrawBoxTab();        ImGui.EndTabItem(); }
                 if (ImGui.BeginTabItem("Indicators")) { DrawIndicatorsTab(); ImGui.EndTabItem(); }
+                if (ImGui.BeginTabItem("Window"))     { DrawWindowTab();     ImGui.EndTabItem(); }
                 ImGui.EndTabBar();
             }
         }
@@ -120,6 +125,49 @@ namespace eft_dma_radar.Silk.UI.Panels
             bool fa = Config.EspFlagAimTarget; uint faClr = Config.EspFlagAimColor;
             if (ColorRow("Aim Target", ref fa, ref faClr, "Indicator when player is your aim target"))
             { Config.EspFlagAimTarget = fa; Config.EspFlagAimColor = faClr; Config.MarkDirty(); }
+        }
+
+        // ── Box tab ───────────────────────────────────────────────────────────────
+
+        private static void DrawBoxTab()
+        {
+            SectionHeader("Style");
+
+            int style = Config.EspBoxStyle;
+            if (UIControls.ComboRow("Box Style", ref style, _boxStyles, "Shape of the bounding box"))
+            { Config.EspBoxStyle = style; Config.MarkDirty(); }
+
+            SectionHeader("Corners");
+
+            float cf = Config.EspBoxCornerFr;
+            ImGui.TextUnformatted("Corner Length");
+            Tip("How much of each side is drawn as a corner (Corners style only)");
+            ImGui.SetNextItemWidth(-1);
+            if (ImGui.SliderFloat("##cf", ref cf, 0.05f, 0.49f, "%.2f"))
+            { Config.EspBoxCornerFr = cf; Config.MarkDirty(); }
+
+            SectionHeader("Thickness");
+
+            float th = Config.EspBoxThickness;
+            ImGui.TextUnformatted("Line Thickness");
+            Tip("Stroke width in pixels");
+            ImGui.SetNextItemWidth(-1);
+            if (ImGui.SliderFloat("##th", ref th, 0.5f, 5f, "%.1f px"))
+            { Config.EspBoxThickness = th; Config.MarkDirty(); }
+        }
+
+        // ── Window tab ────────────────────────────────────────────────────────────
+
+        private static void DrawWindowTab()
+        {
+            SectionHeader("Overlay Opacity");
+
+            ImGui.TextUnformatted("ESP Window Opacity");
+            Tip("Transparency of the entire ESP overlay window (100 = fully opaque)");
+            ImGui.SetNextItemWidth(-1);
+            int opacity = Config.EspOpacity;
+            if (ImGui.SliderInt("##op", ref opacity, 10, 100, "%d %%"))
+            { Config.EspOpacity = opacity; Config.MarkDirty(); }
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────────

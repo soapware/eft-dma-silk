@@ -427,6 +427,15 @@ namespace eft_dma_radar.Silk.Config
         // ── ESP Name Font (0=Regular 12px  1=Consolas 11px  2=CutiveMono 14px) ─
         [JsonPropertyName("espNameFontIdx")]    public int  EspNameFontIdx    { get; set; } = 0;
 
+        // ── ESP Box Style ────────────────────────────────────────────────────────
+        // 0=Corners  1=Full  2=Top+Bottom bars
+        [JsonPropertyName("espBoxStyle")]       public int   EspBoxStyle       { get; set; } = 0;
+        [JsonPropertyName("espBoxCornerFr")]    public float EspBoxCornerFr    { get; set; } = 0.25f;
+        [JsonPropertyName("espBoxThickness")]   public float EspBoxThickness   { get; set; } = 1.5f;
+
+        // ── ESP Window Opacity (0–100 %) ─────────────────────────────────────────
+        [JsonPropertyName("espOpacity")]        public int   EspOpacity        { get; set; } = 100;
+
         // ── Hideout
 
         /// <summary>Enable hideout stash/area reading when entering the hideout scene.</summary>

@@ -75,6 +75,32 @@ namespace eft_dma_radar.Silk.UI.ESP
         private static SKColor ToSKColor(uint argb) =>
             new((byte)(argb >> 16), (byte)(argb >> 8), (byte)argb, (byte)(argb >> 24));
 
+        // ── Win32 layered-window opacity ─────────────────────────────────────────
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern int GetWindowLong(nint hWnd, int nIndex);
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern int SetWindowLong(nint hWnd, int nIndex, int dwNewLong);
+        [DllImport("user32.dll")]
+        private static extern bool SetLayeredWindowAttributes(nint hwnd, uint crKey, byte bAlpha, uint dwFlags);
+
+        private const int  GWL_EXSTYLE    = -20;
+        private const int  WS_EX_LAYERED  = 0x80000;
+        private const uint LWA_ALPHA      = 0x2;
+        private static int _lastOpacity   = -1; // track last applied so we don't call Win32 every frame
+
+        private static void ApplyWindowOpacity()
+        {
+            int pct = Math.Clamp(Config.EspOpacity, 0, 100);
+            if (pct == _lastOpacity) return;
+            _lastOpacity = pct;
+            if (_window?.Native?.Win32 is not { } w32) return;
+            var hwnd = (nint)w32.Hwnd;
+            int style = GetWindowLong(hwnd, GWL_EXSTYLE);
+            SetWindowLong(hwnd, GWL_EXSTYLE, style | WS_EX_LAYERED);
+            byte alpha = (byte)(pct * 255 / 100);
+            SetLayeredWindowAttributes(hwnd, 0, alpha, LWA_ALPHA);
+        }
+
         private static SKFont NameFont => Config.EspNameFontIdx switch
         {
             1 => EspPaints.FontBar,    // Consolas 11px
@@ -227,6 +253,9 @@ namespace eft_dma_radar.Silk.UI.ESP
 
                 Log.WriteLine($"[EspWindow] Loaded — {_window!.Size.X}x{_window.Size.Y}");
 
+                // Apply saved opacity
+                ApplyWindowOpacity();
+
                 // Restore fullscreen if it was active on last close
                 if (Config.EspFullscreen)
                     ToggleEspBorderlessFullscreen();
@@ -366,6 +395,8 @@ namespace eft_dma_radar.Silk.UI.ESP
         {
             if (_grContext is null || _skSurface is null || _gl is null)
                 return;
+
+            ApplyWindowOpacity(); // no-op if unchanged
 
             try
             {
@@ -645,7 +676,8 @@ namespace eft_dma_radar.Silk.UI.ESP
                 if (Config.EspBoxColorOvr != 0)
                 { _dynStroke.Color = ToSKColor(Config.EspBoxColorOvr); actualBoxPaint = _dynStroke; }
                 else actualBoxPaint = boxPaint;
-                DrawCorneredBox(canvas, box, actualBoxPaint);
+                _dynStroke.StrokeWidth = Math.Clamp(Config.EspBoxThickness, 0.5f, 6f);
+                DrawBox(canvas, box, actualBoxPaint);
 
                 // Health bar on left side of box
                 if (Config.EspShowHealth)
@@ -698,6 +730,33 @@ namespace eft_dma_radar.Silk.UI.ESP
             }
         }
 
+        /// <summary>Dispatches to the configured box drawing style.</summary>
+        private static void DrawBox(SKCanvas canvas, SKRect box, SKPaint paint)
+        {
+            switch (Config.EspBoxStyle)
+            {
+                case 1: // Full rectangle
+                    using (var stroke = new SKPaint { Style = SKPaintStyle.Stroke, Color = paint.Color,
+                               StrokeWidth = _dynStroke.StrokeWidth, IsAntialias = true })
+                        canvas.DrawRect(box, stroke);
+                    break;
+
+                case 2: // Top + Bottom bars only
+                {
+                    float sw = _dynStroke.StrokeWidth;
+                    using var p = new SKPaint { Style = SKPaintStyle.Stroke, Color = paint.Color,
+                        StrokeWidth = sw, IsAntialias = true };
+                    canvas.DrawLine(box.Left,  box.Top,    box.Right, box.Top,    p);
+                    canvas.DrawLine(box.Left,  box.Bottom, box.Right, box.Bottom, p);
+                    break;
+                }
+
+                default: // 0 = Corners (original)
+                    DrawCorneredBox(canvas, box, paint);
+                    break;
+            }
+        }
+
         /// <summary>
         /// Draws a cornered box (only corners drawn, not full rectangle).
         /// </summary>
@@ -705,8 +764,9 @@ namespace eft_dma_radar.Silk.UI.ESP
         {
             float w = box.Width;
             float h = box.Height;
-            float cw = w * CornerFraction;
-            float ch = h * CornerFraction;
+            float cf = Math.Clamp(Config.EspBoxCornerFr, 0.05f, 0.49f);
+            float cw = w * cf;
+            float ch = h * cf;
 
             // Outline (thicker, black)
             // Top-left

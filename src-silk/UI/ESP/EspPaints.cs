@@ -138,6 +138,13 @@ namespace eft_dma_radar.Silk.UI.ESP
 
         #endregion
 
+        #region Key Door
+
+        /// <summary>Bright cyan — matches <see cref="SKPaints.PaintKeyDoor"/> on the radar.</summary>
+        public static SKPaint TextKeyDoor { get; } = MakeFillPaint(0, 220, 240, 240);
+
+        #endregion
+
         #region Crosshair
 
         public static SKPaint Crosshair { get; } = new()

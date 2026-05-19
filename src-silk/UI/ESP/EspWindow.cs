@@ -3,6 +3,7 @@
 // See LICENSE in the repository root for details.
 
 using System.Runtime.CompilerServices;
+using eft_dma_radar.Silk.Tarkov.GameWorld.Interactables;
 using eft_dma_radar.Silk.Tarkov.GameWorld.Player;
 using eft_dma_radar.Silk.Tarkov.Unity;
 using Silk.NET.Input;
@@ -450,6 +451,32 @@ namespace eft_dma_radar.Silk.UI.ESP
                     {
                         Log.WriteRateLimited(AppLogLevel.Warning, "esp_player_draw", TimeSpan.FromSeconds(5),
                             $"[EspWindow] DrawPlayer failed: {ex.Message}");
+                    }
+                }
+            }
+
+            // Key-held locked doors
+            if (Config.ShowKeyDoors)
+            {
+                var doors = Memory.Doors;
+                if (doors is not null)
+                {
+                    foreach (var door in doors)
+                    {
+                        if (!door.IsKeyHeld || door.KeyName is not { } keyName) continue;
+                        var pos = door.Position;
+                        if (!IsFinite(pos) || pos.LengthSquared() < 1f) continue;
+                        if (!CameraManager.WorldToScreen(ref pos, out var sp, false, false)) continue;
+
+                        float dist = Vector3.Distance(localPos, door.Position);
+                        string label = $"{keyName} [{(int)dist}m]";
+                        float lw = EspPaints.FontInfo.MeasureText(label);
+                        float lx = sp.X - lw / 2f;
+                        float ly = sp.Y - 10f;
+
+                        canvas.DrawCircle(sp.X, sp.Y, 4f, EspPaints.TextKeyDoor);
+                        canvas.DrawText(label, lx + 1, ly + 1, EspPaints.FontInfo, EspPaints.TextShadow);
+                        canvas.DrawText(label, lx, ly, EspPaints.FontInfo, EspPaints.TextKeyDoor);
                     }
                 }
             }

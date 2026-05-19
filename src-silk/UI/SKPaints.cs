@@ -305,6 +305,10 @@ namespace eft_dma_radar.Silk.UI
         public static SKPaint PaintDoorBreaching { get; } = NewFillPaint(new SKColor(255, 100, 100));
         public static SKPaint TextDoorBreaching { get; } = NewTextPaint(new SKColor(255, 100, 100));
 
+        /// <summary>Key door — local player holds the required key. Bright cyan, distinct from all other door colors.</summary>
+        public static SKPaint PaintKeyDoor { get; } = NewFillPaint(new SKColor(0, 220, 240));
+        public static SKPaint TextKeyDoor  { get; } = NewTextPaint(new SKColor(0, 220, 240));
+
         #endregion
 
         #region Quest Paints

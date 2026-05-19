@@ -534,6 +534,14 @@ namespace eft_dma_radar.Silk.Config
         /// <summary>Maximum distance (meters) from a door to important loot for it to be shown.</summary>
         public float DoorLootProximity { get; set; } = 25f;
 
+        /// <summary>
+        /// Highlight locked doors for which the local player holds the required key.
+        /// Applies to both the radar map (cyan blip) and the ESP overlay (cyan label).
+        /// The inventory is scanned every 30 seconds.
+        /// </summary>
+        [JsonPropertyName("showKeyDoors")]
+        public bool ShowKeyDoors { get; set; } = true;
+
         // ── Map Style ──────────────────────────────────────────────────────────
 
         /// <summary>

@@ -66,6 +66,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         private WorkerThread? _cameraWorker;
         private WorkerThread? _explosivesWorker;
         private WorkerThread? _lootWorker;
+        private readonly KeyInventoryScanner _keyScanner = new();
 
         // Deferred CameraManager retry state — used by the camera worker.
         // Uses a time budget with adaptive backoff rather than a fixed attempt cap,
@@ -828,6 +829,14 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                             doors[i].UpdateNearLootFlag(loot, proxSq);
                     }
                 }
+            }
+
+            // Key inventory scan — rate-limited internally to once per 30s
+            if (_localPlayerAddr != 0 && SilkProgram.Config.ShowKeyDoors)
+            {
+                var doors = _interactablesManager.Doors;
+                if (doors.Count > 0)
+                    _keyScanner.Update(_localPlayerAddr, doors);
             }
 
             // Periodic transform validation

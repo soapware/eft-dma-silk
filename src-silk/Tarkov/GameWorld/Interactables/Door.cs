@@ -36,6 +36,12 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Interactables
         /// </summary>
         public volatile bool IsNearLoot;
 
+        /// <summary>
+        /// Set by <see cref="Player.KeyInventoryScanner"/> when the local player holds
+        /// the key for this door. Volatile — written from worker, read from render thread.
+        /// </summary>
+        public volatile bool IsKeyHeld;
+
         public Door(ulong ptr, string id, string? keyId, string? keyName, Vector3 position, EDoorState state)
         {
             Base = ptr;
@@ -122,14 +128,20 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Interactables
             canvas.DrawText(_cachedDistText, dx, dy, SKPaints.FontRegular11, text);
         }
 
-        private (SKPaint dot, SKPaint text) GetPaints() => DoorState switch
+        private (SKPaint dot, SKPaint text) GetPaints()
         {
-            EDoorState.Open => (SKPaints.PaintDoorOpen, SKPaints.TextDoorOpen),
-            EDoorState.Shut => (SKPaints.PaintDoorShut, SKPaints.TextDoorShut),
-            EDoorState.Interacting => (SKPaints.PaintDoorInteracting, SKPaints.TextDoorInteracting),
-            EDoorState.Breaching => (SKPaints.PaintDoorBreaching, SKPaints.TextDoorBreaching),
-            _ => (SKPaints.PaintDoorLocked, SKPaints.TextDoorLocked),
-        };
+            if (SilkProgram.Config.ShowKeyDoors && IsKeyHeld && DoorState is EDoorState.Locked)
+                return (SKPaints.PaintKeyDoor, SKPaints.TextKeyDoor);
+
+            return DoorState switch
+            {
+                EDoorState.Open        => (SKPaints.PaintDoorOpen,        SKPaints.TextDoorOpen),
+                EDoorState.Shut        => (SKPaints.PaintDoorShut,        SKPaints.TextDoorShut),
+                EDoorState.Interacting => (SKPaints.PaintDoorInteracting, SKPaints.TextDoorInteracting),
+                EDoorState.Breaching   => (SKPaints.PaintDoorBreaching,   SKPaints.TextDoorBreaching),
+                _                      => (SKPaints.PaintDoorLocked,      SKPaints.TextDoorLocked),
+            };
+        }
     }
 
     /// <summary>

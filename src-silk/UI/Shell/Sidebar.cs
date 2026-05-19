@@ -109,6 +109,10 @@ namespace eft_dma_radar.Silk.UI.Shell
             new Item("Hotkeys", "Hotkeys", "",
                 static () => HotkeyManagerPanel.IsOpen,
                 static () => HotkeyManagerPanel.IsOpen = !HotkeyManagerPanel.IsOpen),
+
+            new Item("Visuals", "Visuals", "",
+                static () => EspCustomizationPanel.IsOpen,
+                static () => EspCustomizationPanel.IsOpen = !EspCustomizationPanel.IsOpen),
         ];
 
         // Colors (UITheme-aligned)

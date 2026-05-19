@@ -68,6 +68,20 @@ namespace eft_dma_radar.Silk.UI.ESP
 
         private static SilkConfig Config => SilkProgram.Config;
 
+        // Cached dynamic paints — color set before each use, avoids per-frame SKPaint allocation
+        private static readonly SKPaint _dynFill   = new() { Style = SKPaintStyle.Fill,   IsAntialias = true };
+        private static readonly SKPaint _dynStroke = new() { Style = SKPaintStyle.Stroke, IsAntialias = true, StrokeWidth = 1.5f };
+
+        private static SKColor ToSKColor(uint argb) =>
+            new((byte)(argb >> 16), (byte)(argb >> 8), (byte)argb, (byte)(argb >> 24));
+
+        private static SKFont NameFont => Config.EspNameFontIdx switch
+        {
+            1 => EspPaints.FontBar,    // Consolas 11px
+            2 => EspPaints.FontStatus, // CutiveMono 14px
+            _ => EspPaints.FontName,   // Regular 12px (default)
+        };
+
         #endregion
 
         #region Open / Close
@@ -626,10 +640,16 @@ namespace eft_dma_radar.Silk.UI.ESP
                     centerX + boxWidth * 0.5f,
                     bottomY);
 
-                DrawCorneredBox(canvas, box, boxPaint);
+                // Box — optional color override; 0 = use per-type paint
+                SKPaint actualBoxPaint;
+                if (Config.EspBoxColorOvr != 0)
+                { _dynStroke.Color = ToSKColor(Config.EspBoxColorOvr); actualBoxPaint = _dynStroke; }
+                else actualBoxPaint = boxPaint;
+                DrawCorneredBox(canvas, box, actualBoxPaint);
 
                 // Health bar on left side of box
-                DrawHealthBar(canvas, player, box);
+                if (Config.EspShowHealth)
+                    DrawHealthBar(canvas, player, box);
             }
             else if (drawHeadDot)
             {
@@ -640,22 +660,42 @@ namespace eft_dma_radar.Silk.UI.ESP
                 DrawBones(canvas, player);
 
             // ---- Labels ----
+            var nameFont = NameFont;
             string name = player.Name;
-            if (!string.IsNullOrEmpty(name))
+            if (Config.EspShowName && !string.IsNullOrEmpty(name))
             {
-                float nameWidth = EspPaints.FontName.MeasureText(name);
+                _dynFill.Color = ToSKColor(Config.EspNameColor);
+                float nameWidth = nameFont.MeasureText(name);
                 float nameX = centerX - nameWidth * 0.5f;
                 float nameY = topY - 4f;
-                canvas.DrawText(name, nameX + 1, nameY + 1, EspPaints.FontName, EspPaints.TextShadow);
-                canvas.DrawText(name, nameX, nameY, EspPaints.FontName, textPaint);
+                canvas.DrawText(name, nameX + 1, nameY + 1, nameFont, EspPaints.TextShadow);
+                canvas.DrawText(name, nameX, nameY, nameFont, _dynFill);
             }
 
-            string distText = $"{(int)distance}m";
-            float distWidth = EspPaints.FontInfo.MeasureText(distText);
-            float distX = centerX - distWidth * 0.5f;
             float distY = bottomY + EspPaints.FontInfo.Size + 2f;
-            canvas.DrawText(distText, distX + 1, distY + 1, EspPaints.FontInfo, EspPaints.TextShadow);
-            canvas.DrawText(distText, distX, distY, EspPaints.FontInfo, textPaint);
+            if (Config.EspShowDistLabel)
+            {
+                _dynFill.Color = ToSKColor(Config.EspDistColor);
+                string distText = $"{(int)distance}m";
+                float distWidth = EspPaints.FontInfo.MeasureText(distText);
+                float distX = centerX - distWidth * 0.5f;
+                canvas.DrawText(distText, distX + 1, distY + 1, EspPaints.FontInfo, EspPaints.TextShadow);
+                canvas.DrawText(distText, distX, distY, EspPaints.FontInfo, _dynFill);
+            }
+
+            // Weapon label (below distance)
+            if (Config.EspShowWeapon)
+            {
+                string? weapon = player.InHandsItem;
+                if (!string.IsNullOrEmpty(weapon))
+                {
+                    _dynFill.Color = ToSKColor(Config.EspWeaponColor);
+                    float ww = EspPaints.FontInfo.MeasureText(weapon);
+                    float wy = distY + EspPaints.FontInfo.Size + 2f;
+                    canvas.DrawText(weapon, centerX - ww * 0.5f + 1, wy + 1, EspPaints.FontInfo, EspPaints.TextShadow);
+                    canvas.DrawText(weapon, centerX - ww * 0.5f,     wy,     EspPaints.FontInfo, _dynFill);
+                }
+            }
         }
 
         /// <summary>
@@ -775,15 +815,15 @@ namespace eft_dma_radar.Silk.UI.ESP
                 _ => 1f,
             };
 
-            var healthPaint = healthPct switch
+            _dynFill.Color = healthPct switch
             {
-                > 0.5f => EspPaints.HealthGreen,
-                > 0.25f => EspPaints.HealthYellow,
-                _ => EspPaints.HealthRed,
+                > 0.5f  => ToSKColor(Config.EspHealthColHigh),
+                > 0.25f => ToSKColor(Config.EspHealthColMid),
+                _       => ToSKColor(Config.EspHealthColLow),
             };
 
             float fillHeight = barHeight * healthPct;
-            canvas.DrawRect(barLeft, barBottom - fillHeight, HealthBarWidth, fillHeight, healthPaint);
+            canvas.DrawRect(barLeft, barBottom - fillHeight, HealthBarWidth, fillHeight, _dynFill);
         }
 
         /// <summary>

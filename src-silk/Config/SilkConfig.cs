@@ -400,6 +400,33 @@ namespace eft_dma_radar.Silk.Config
         [JsonPropertyName("espFullscreen")]
         public bool EspFullscreen { get; set; } = false;
 
+        // ── ESP Feature Toggles ─────────────────────────────────────────────────
+        [JsonPropertyName("espShowName")]       public bool EspShowName       { get; set; } = true;
+        [JsonPropertyName("espShowHealth")]     public bool EspShowHealth     { get; set; } = true;
+        [JsonPropertyName("espShowHealthNum")]  public bool EspShowHealthNum  { get; set; } = false;
+        [JsonPropertyName("espShowWeapon")]     public bool EspShowWeapon     { get; set; } = false;
+        [JsonPropertyName("espShowDistLabel")]  public bool EspShowDistLabel  { get; set; } = true;
+        [JsonPropertyName("espShowHighlight")]  public bool EspShowHighlight  { get; set; } = false;
+
+        // ── ESP Colors (uint ARGB packed; EspBoxColorOvr=0 means use per-type color) ──
+        [JsonPropertyName("espNameColor")]      public uint EspNameColor      { get; set; } = 0xFFFFFFFF;
+        [JsonPropertyName("espBoxColorOvr")]    public uint EspBoxColorOvr    { get; set; } = 0x00000000;
+        [JsonPropertyName("espHealthColHigh")]  public uint EspHealthColHigh  { get; set; } = 0xFF32C832;
+        [JsonPropertyName("espHealthColMid")]   public uint EspHealthColMid   { get; set; } = 0xFFDCC832;
+        [JsonPropertyName("espHealthColLow")]   public uint EspHealthColLow   { get; set; } = 0xFFDC3232;
+        [JsonPropertyName("espWeaponColor")]    public uint EspWeaponColor    { get; set; } = 0xFFCCCCCC;
+        [JsonPropertyName("espHighlightColor")] public uint EspHighlightColor { get; set; } = 0xFFFF4400;
+        [JsonPropertyName("espDistColor")]      public uint EspDistColor      { get; set; } = 0xFFAAAAAA;
+
+        // ── ESP Flag Indicators ─────────────────────────────────────────────────
+        [JsonPropertyName("espFlagDistance")]   public bool EspFlagDistance   { get; set; } = true;
+        [JsonPropertyName("espFlagAimTarget")]  public bool EspFlagAimTarget  { get; set; } = false;
+        [JsonPropertyName("espFlagDistColor")]  public uint EspFlagDistColor  { get; set; } = 0xFF88CCFF;
+        [JsonPropertyName("espFlagAimColor")]   public uint EspFlagAimColor   { get; set; } = 0xFFFF8800;
+
+        // ── ESP Name Font (0=Regular 12px  1=Consolas 11px  2=CutiveMono 14px) ─
+        [JsonPropertyName("espNameFontIdx")]    public int  EspNameFontIdx    { get; set; } = 0;
+
         // ── Hideout
 
         /// <summary>Enable hideout stash/area reading when entering the hideout scene.</summary>

@@ -199,6 +199,16 @@ namespace eft_dma_radar.Silk.UI.Panels
                     ImGui.Unindent(16);
                 }
 
+                ImGui.Spacing();
+
+                bool showKeyDoors = Config.ShowKeyDoors;
+                if (UIControls.ToggleRow("Highlight Key Doors", ref showKeyDoors,
+                    "Highlight locked doors (cyan) that the local player holds a key for.\nInventory is scanned every 30 seconds."))
+                {
+                    Config.ShowKeyDoors = showKeyDoors;
+                    Config.MarkDirty();
+                }
+
                 ImGui.Unindent(16);
             }
 

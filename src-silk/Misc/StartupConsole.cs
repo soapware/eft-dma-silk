@@ -32,7 +32,7 @@ namespace eft_dma_radar.Silk.Misc
             if (!Log.CleanMode) return;
             Console.Title = "EFT (Silk.NET) - Console";
 
-            const string title = "EFT DMA Radar  |  Silk.NET Edition  (soapware)";
+            const string title = "HuiTeab's EFT DMA Radar  |  Silk.NET Edition  (soapware fork)";
             string bar = new string('─', title.Length + 4); // ─ repeated, 2-space pad each side
 
             Console.ForegroundColor = ConsoleColor.DarkGray;

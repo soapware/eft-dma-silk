@@ -19,7 +19,7 @@ namespace eft_dma_radar.Silk
 {
     internal static partial class SilkProgram
     {
-        internal const string Name = "EFT DMA Radar";
+        internal const string Name = "EFT (Silk.NET)";
 
         internal static MemoryState State => Memory.State;
 

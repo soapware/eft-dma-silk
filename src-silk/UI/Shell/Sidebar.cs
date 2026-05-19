@@ -82,7 +82,7 @@ namespace eft_dma_radar.Silk.UI.Shell
         /// </summary>
         private static readonly Item[] _secondaryItems =
         [
-            new Item("Filt", "Loot Filters", "L",
+            new Item("Filter", "Loot Filters", "L",
                 static () => LootFiltersPanel.IsOpen,
                 static () => LootFiltersPanel.IsOpen = !LootFiltersPanel.IsOpen),
 
@@ -98,7 +98,7 @@ namespace eft_dma_radar.Silk.UI.Shell
                 static () => QuestPlannerPanel.IsOpen,
                 static () => QuestPlannerPanel.IsOpen = !QuestPlannerPanel.IsOpen),
 
-            new Item("Hist", "Player History", "",
+            new Item("History", "Player History", "",
                 static () => PlayerHistoryPanel.IsOpen,
                 static () => PlayerHistoryPanel.IsOpen = !PlayerHistoryPanel.IsOpen),
 

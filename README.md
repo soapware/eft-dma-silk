@@ -10,7 +10,6 @@ A DMA radar overlay for **Escape from Tarkov** built on [Silk.NET](https://githu
 
 ### Visual & UI
 
-- **Magenta accent** — UI accent color changed to `#ff00f5` throughout: pill buttons, sidebar active state, chip highlights, and web radar CSS variable.
 - **Sidebar readability** — single-word panels now show their full name (Players, Loot, Aimview, Quests, Settings). Primary tab font bumped to 15 px for easier reading at distance or over AnyDesk.
 - **Radar window centering** — window auto-centers on the configured target monitor at launch instead of defaulting to (0, 0).
 - **Per-window icons** — custom icons embedded in the exe (app icon visible in Explorer/taskbar) and applied individually to the radar window, ESP overlay window, and startup screen.
@@ -18,8 +17,6 @@ A DMA radar overlay for **Escape from Tarkov** built on [Silk.NET](https://githu
 
 ### Status Screen
 
-- **Cutive Mono font** — status banner and DMA stats box now use Cutive Mono (monospace) instead of MS Gothic.
-- **Wave animation overhaul** — ping-pong crest sweeps across the banner text with edge fade, randomised ASCII fill characters, and occasional accented-Latin ghost characters. Speed and zone width scale with text length.
 - **State-aware messaging** — startup sub-line reads `[ INITIALIZING DMA INTERFACE ]` while the DMA card is connecting, then switches to `[ WAITING FOR TARKOV ]` once the card is live and the radar is polling for the game process.
 - **DMA stats box** — Skia-drawn box below the banner shows HW MAX throughput and fault/issue counter for the current session.
 

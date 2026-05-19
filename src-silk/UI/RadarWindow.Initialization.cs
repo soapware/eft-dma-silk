@@ -142,6 +142,19 @@ namespace eft_dma_radar.Silk.UI
                     keyboard.KeyDown += OnKeyDown;
                 }
 
+                // Clear any CursorMode.Hidden GLFW stored from a previous ImGui frame.
+                foreach (var mouse in _input.Mice)
+                    mouse.Cursor.CursorMode = CursorMode.Normal;
+
+                // Re-assert Normal on focus gain — GLFW re-applies its stored cursor mode
+                // when the window regains focus, so this fires before the next render frame.
+                _window.FocusChanged += isFocused =>
+                {
+                    if (!isFocused) return;
+                    foreach (var mouse in _input.Mice)
+                        mouse.Cursor.CursorMode = CursorMode.Normal;
+                };
+
                 _window.Render += OnRender;
                 _window.Resize += OnResize;
                 _window.Closing += OnClosing;

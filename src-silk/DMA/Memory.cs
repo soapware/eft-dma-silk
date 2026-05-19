@@ -211,15 +211,18 @@ namespace eft_dma_radar.Silk.DMA
                 // Fast path: try to connect without warm-up first (saves 22s on ready hardware)
                 bool connected = false;
                 Log.WriteLine("[Memory] Attempting fast VMM connection (no warm-up)...");
+                StartupConsole.PrintStep("DMA Card", "Connecting...", StepState.Pending);
                 try
                 {
                     _vmm = new Vmm([.. args]);
                     Log.WriteLine("[Memory] VMM connected immediately — no warm-up needed.");
+                    StartupConsole.PrintStep("DMA Card", "Connected", StepState.Ok);
                     connected = true;
                 }
                 catch (VmmSharpEx.VmmException)
                 {
                     Log.WriteLine("[Memory] Fast path failed — running FT601 warm-up...");
+                    StartupConsole.PrintStep("DMA Card", "USB warm-up required (~10s)...", StepState.Pending);
                     WarmUpFt601(config.DeviceStr);
                 }
 
@@ -233,6 +236,7 @@ namespace eft_dma_radar.Silk.DMA
                         {
                             _vmm = new Vmm([.. args]);
                             Log.WriteLine($"[Memory] VMM connected on attempt {attempt}.");
+                            StartupConsole.PrintDmaAttempt(attempt, connected: true);
                             break;
                         }
                         catch (VmmSharpEx.VmmException ex)
@@ -242,6 +246,7 @@ namespace eft_dma_radar.Silk.DMA
                             if (attempt % 4 == 0)
                                 Log.WriteLine($"[Memory] Still waiting for DMA device... (attempt {attempt})");
                             Log.WriteLine($"[Memory] Attempt {attempt} failed ({ex.Message}), retrying in 3s...");
+                            StartupConsole.PrintDmaAttempt(attempt, connected: false);
                             Thread.Sleep(3000);
                         }
                     }
@@ -396,6 +401,7 @@ namespace eft_dma_radar.Silk.DMA
                 float mbps = (float)(ok * ChunkSize / 1_048_576.0 / sw.Elapsed.TotalSeconds);
                 DmaStats.SetMaxThroughput(mbps);
                 Log.WriteLine($"[Memory] Throughput benchmark: {mbps:F1} MB/s ({ok}/{totalReads} reads OK in {sw.Elapsed.TotalSeconds:F1} s)");
+                StartupConsole.PrintStep("Benchmark", $"{mbps:N0} MB/s", mbps > 500 ? StepState.Ok : StepState.Warn);
             }
             catch (Exception ex)
             {
@@ -445,6 +451,7 @@ namespace eft_dma_radar.Silk.DMA
         private static void RunStartupLoop()
         {
             Log.WriteLine("[Memory] Waiting for game process...");
+            StartupConsole.PrintStep("Game", "Waiting for EscapeFromTarkov.exe...", StepState.Pending);
             SetState(MemoryState.WaitingForProcess);
             var cooldown = Stopwatch.StartNew();
 
@@ -486,6 +493,8 @@ namespace eft_dma_radar.Silk.DMA
                     if (!modulesReady)
                         throw new Exception("Modules failed to load after retries.");
 
+                    StartupConsole.PrintStep("Game", $"Found (PID {_pid})", StepState.Ok);
+
                     // Wait for EFT's IL2CPP runtime to finish initializing the TypeInfoTable.
                     // The game populates it a few seconds after its modules load; probing it
                     // directly is the most reliable guard.  We check using the hardcoded
@@ -493,18 +502,22 @@ namespace eft_dma_radar.Silk.DMA
                     // ready.  Cap at 60 s; Il2CppDumper has its own 30-retry loop as backup.
                     WaitForTypeInfoTable();
 
+                    StartupConsole.PrintStep("Offsets", "Loading from memory...", StepState.Pending);
                     eft_dma_radar.Silk.Tarkov.Unity.IL2CPP.Il2CppDumper.Dump();
                     // NOTE: CameraManager.Initialize() (AllCameras sig-scan + camera_offsets.json)
                     // is intentionally deferred to Phase 4 (Aimview). Not needed for Phase 1.
 
+                    StartupConsole.PrintStep("Offsets", "Ready", StepState.Ok);
                     SetState(MemoryState.Initializing);
                     Log.WriteLine("[Memory] Game startup OK.");
                     Notify("Game startup OK", NotificationLevel.Info);
+                    StartupConsole.PrintStep("Radar", "Started — waiting for raid", StepState.Ok);
                     return;
                 }
                 catch (Exception ex)
                 {
                     Log.WriteLine($"[Memory] Startup failed: {ex.Message}");
+                    StartupConsole.PrintError("Startup failed", "Ensure EFT is fully launched on the target machine");
                     OnGameStopped();
                     Thread.Sleep(1000);
                 }

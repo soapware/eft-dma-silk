@@ -81,6 +81,11 @@ namespace eft_dma_radar.Silk
                 if (Log.EnableDebugLogging)
                     Log.WriteLine("[SilkProgram] Debug logging enabled.");
 
+                // Clean console mode: suppress raw log lines and use StartupConsole instead.
+                // Disabled when -debug is active so all raw lines remain visible.
+                Log.CleanMode = !Log.EnableDebugLogging;
+                StartupConsole.PrintHeader();
+
                 ExceptionTracer.Install();
 
                 // Pre-load native DLLs BEFORE any system state changes (power plan, priority).

@@ -83,6 +83,13 @@ namespace eft_dma_radar.Silk.Misc
         public static AppLogLevel MinimumLogLevel { get; set; } = AppLogLevel.Info;
         public static bool EnableDebugLogging { get; set; } = false;
 
+        /// <summary>
+        /// When true, raw log lines are suppressed from the console window.
+        /// <see cref="StartupConsole"/> handles curated console output instead.
+        /// Raw lines still go to the debug sink and optional file log.
+        /// </summary>
+        public static bool CleanMode { get; set; } = false;
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool IsEnabled(AppLogLevel level) =>
             level >= MinimumLogLevel && (level != AppLogLevel.Debug || EnableDebugLogging);
@@ -112,7 +119,7 @@ namespace eft_dma_radar.Silk.Misc
 
             Debug.WriteLine(formatted);
 
-            if (_consoleAllocated)
+            if (_consoleAllocated && !CleanMode)
             {
                 var color = message.Contains("ERROR") || message.Contains("FAIL")
                     ? ConsoleColor.Red

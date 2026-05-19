@@ -31,6 +31,7 @@ namespace eft_dma_radar.Silk.UI.Panels
 
         public static void Draw()
         {
+            if (!IsOpen) return;
             bool isOpen = IsOpen;
             using var scope = PanelWindow.Begin("ESP Visuals", ref isOpen, new Vector2(480, 520));
             IsOpen = isOpen;

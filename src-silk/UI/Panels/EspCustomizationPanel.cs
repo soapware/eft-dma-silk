@@ -7,8 +7,7 @@ using ImGuiNET;
 namespace eft_dma_radar.Silk.UI.Panels
 {
     /// <summary>
-    /// ESP Visuals customization panel — per-feature toggles and inline color pickers
-    /// modelled on the Copland render → players and render → indicators sub-tabs.
+    /// ESP Visuals customization panel — per-feature toggles and inline color pickers.
     /// </summary>
     internal static class EspCustomizationPanel
     {
@@ -20,14 +19,19 @@ namespace eft_dma_radar.Silk.UI.Panels
         private static SilkConfig Config => SilkProgram.Config;
         private static float UIScale => Config.UIScale;
 
+        // Flags used for every color picker button
+        private const ImGuiColorEditFlags PickerFlags =
+            ImGuiColorEditFlags.NoLabel    |
+            ImGuiColorEditFlags.NoInputs   |
+            ImGuiColorEditFlags.AlphaPreview |
+            ImGuiColorEditFlags.AlphaBar;
+
         public static void Draw()
         {
-            if (!IsOpen) return;
-
-            ImGui.SetNextWindowSize(new Vector2(480f * UIScale, 460f * UIScale), ImGuiCond.FirstUseEver);
-            bool open = IsOpen;
-            ImGui.Begin("ESP Visuals", ref open);
-            IsOpen = open;
+            bool isOpen = IsOpen;
+            using var scope = PanelWindow.Begin("ESP Visuals", ref isOpen, new Vector2(480, 460));
+            IsOpen = isOpen;
+            if (!scope.Visible) return;
 
             if (ImGui.BeginTabBar("##espvis-tabs"))
             {
@@ -35,8 +39,6 @@ namespace eft_dma_radar.Silk.UI.Panels
                 if (ImGui.BeginTabItem("Indicators")) { DrawIndicatorsTab(); ImGui.EndTabItem(); }
                 ImGui.EndTabBar();
             }
-
-            ImGui.End();
         }
 
         // ── Players tab ───────────────────────────────────────────────────────────
@@ -51,7 +53,7 @@ namespace eft_dma_radar.Silk.UI.Panels
             Tip("Master toggle — show/hide all player ESP");
 
             bool showName = Config.EspShowName; uint nameClr = Config.EspNameColor;
-            if (ColorFeatureRow("Name", ref showName, ref nameClr, "Name label above the bounding box"))
+            if (ColorRow("Name", ref showName, ref nameClr, "Name label above the bounding box"))
             { Config.EspShowName = showName; Config.EspNameColor = nameClr; Config.MarkDirty(); }
 
             uint boxClr = Config.EspBoxColorOvr;
@@ -59,7 +61,7 @@ namespace eft_dma_radar.Silk.UI.Panels
             { Config.EspBoxColorOvr = boxClr; Config.MarkDirty(); }
 
             bool showHealth = Config.EspShowHealth; uint healthHi = Config.EspHealthColHigh;
-            if (ColorFeatureRow("Health", ref showHealth, ref healthHi, "Health bar (high-health color)"))
+            if (ColorRow("Health", ref showHealth, ref healthHi, "Health bar (high-health color)"))
             { Config.EspShowHealth = showHealth; Config.EspHealthColHigh = healthHi; Config.MarkDirty(); }
 
             bool showHNum = Config.EspShowHealthNum;
@@ -68,15 +70,15 @@ namespace eft_dma_radar.Silk.UI.Panels
             Tip("Show HP % number on the health bar");
 
             bool showWeapon = Config.EspShowWeapon; uint weapClr = Config.EspWeaponColor;
-            if (ColorFeatureRow("Weapon", ref showWeapon, ref weapClr, "Current weapon short name label"))
+            if (ColorRow("Weapon", ref showWeapon, ref weapClr, "Current weapon short name label"))
             { Config.EspShowWeapon = showWeapon; Config.EspWeaponColor = weapClr; Config.MarkDirty(); }
 
             bool showHL = Config.EspShowHighlight; uint hlClr = Config.EspHighlightColor;
-            if (ColorFeatureRow("Highlight Target", ref showHL, ref hlClr, "Tint on current aim target"))
+            if (ColorRow("Highlight Target", ref showHL, ref hlClr, "Tint on current aim target"))
             { Config.EspShowHighlight = showHL; Config.EspHighlightColor = hlClr; Config.MarkDirty(); }
 
             bool showDist = Config.EspShowDistLabel; uint distClr = Config.EspDistColor;
-            if (ColorFeatureRow("Distance Label", ref showDist, ref distClr, "Distance in metres below box"))
+            if (ColorRow("Distance Label", ref showDist, ref distClr, "Distance in metres below box"))
             { Config.EspShowDistLabel = showDist; Config.EspDistColor = distClr; Config.MarkDirty(); }
 
             SectionHeader("Range");
@@ -112,70 +114,44 @@ namespace eft_dma_radar.Silk.UI.Panels
             SectionHeader("Flags");
 
             bool fd = Config.EspFlagDistance; uint fdClr = Config.EspFlagDistColor;
-            if (ColorFeatureRow("Distance", ref fd, ref fdClr, "Append distance next to name"))
+            if (ColorRow("Distance", ref fd, ref fdClr, "Append distance next to name"))
             { Config.EspFlagDistance = fd; Config.EspFlagDistColor = fdClr; Config.MarkDirty(); }
 
             bool fa = Config.EspFlagAimTarget; uint faClr = Config.EspFlagAimColor;
-            if (ColorFeatureRow("Aim Target", ref fa, ref faClr, "Indicator when player is your aim target"))
+            if (ColorRow("Aim Target", ref fa, ref faClr, "Indicator when player is your aim target"))
             { Config.EspFlagAimTarget = fa; Config.EspFlagAimColor = faClr; Config.MarkDirty(); }
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────────
 
-        // Checkbox on left, label, color swatch on right — returns true if anything changed
-        private static bool ColorFeatureRow(string label, ref bool toggle, ref uint color, string tip)
+        // Checkbox + label + inline color picker — returns true if anything changed
+        private static bool ColorRow(string label, ref bool toggle, ref uint color, string tip)
         {
-            bool changed  = false;
-            float swatchSz = 16f * UIScale;
-
+            bool changed = false;
             bool t = toggle;
             if (ImGui.Checkbox("##t" + label, ref t)) { toggle = t; changed = true; }
             ImGui.SameLine();
             ImGui.TextUnformatted(label);
             Tip(tip);
-
-            ImGui.SameLine(ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X - swatchSz);
-            if (ColorSwatch("##c" + label, ref color, label + " color")) changed = true;
-
+            ImGui.SameLine();
+            var vec = ToVec4(color);
+            if (ImGui.ColorEdit4("##c" + label, ref vec, PickerFlags))
+            { color = FromVec4(vec); changed = true; }
             return changed;
         }
 
-        // Dim label + color swatch only — returns true if color changed
+        // Dim label + inline color picker — returns true if color changed
         private static bool ColorOnlyRow(string label, ref uint color, string tip)
         {
-            float swatchSz = 16f * UIScale;
             ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.55f, 0.60f, 0.65f, 1f));
             ImGui.TextUnformatted(label);
             ImGui.PopStyleColor();
             Tip(tip);
-
-            ImGui.SameLine(ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X - swatchSz);
-            return ColorSwatch("##co" + label, ref color, tip);
-        }
-
-        // Small color button that opens a full color picker popup — returns true if changed
-        private static bool ColorSwatch(string id, ref uint color, string tooltip)
-        {
-            float sz   = 16f * UIScale;
-            var vec    = ToVec4(color);
+            ImGui.SameLine();
+            var vec = ToVec4(color);
             bool changed = false;
-
-            if (ImGui.ColorButton(id, vec,
-                ImGuiColorEditFlags.AlphaPreview | ImGuiColorEditFlags.NoBorder,
-                new Vector2(sz, sz)))
-                ImGui.OpenPopup(id + "p");
-
-            Tip(tooltip);
-
-            if (ImGui.BeginPopup(id + "p"))
-            {
-                if (ImGui.ColorPicker4(id + "pk", ref vec,
-                    ImGuiColorEditFlags.AlphaBar |
-                    ImGuiColorEditFlags.DisplayRGB |
-                    ImGuiColorEditFlags.DisplayHex))
-                { color = FromVec4(vec); changed = true; }
-                ImGui.EndPopup();
-            }
+            if (ImGui.ColorEdit4("##co" + label, ref vec, PickerFlags))
+            { color = FromVec4(vec); changed = true; }
             return changed;
         }
 

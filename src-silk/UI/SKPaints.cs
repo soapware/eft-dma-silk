@@ -218,6 +218,36 @@ namespace eft_dma_radar.Silk.UI
         /// <summary>Top-tier loot on a different floor — dimmed.</summary>
         public static SKPaint LootTopDimmed { get; } = NewTextPaint(new SKColor(255, 215, 0, 120));
 
+        /// <summary>Medical item tint — pink/red when LootMedsRedTint is active.</summary>
+        public static SKPaint LootMed       { get; } = NewTextPaint(new SKColor(230, 80, 80));
+        /// <summary>Medical item tint on a different floor — dimmed.</summary>
+        public static SKPaint LootMedDimmed { get; } = NewTextPaint(new SKColor(230, 80, 80, 100));
+
+        // ── Price gradient LUTs (20 steps, index 0 = cheapest) ──────────────
+        /// <summary>Green price gradient — dark green (cheap) → bright green (expensive).</summary>
+        public static SKPaint[] LootGradient       { get; } = BuildGradient(new SKColor(20, 100, 20),     new SKColor(50, 255, 50));
+        /// <summary>Green price gradient dimmed variant (different floor).</summary>
+        public static SKPaint[] LootGradientDimmed { get; } = BuildGradient(new SKColor(20, 100, 20, 80), new SKColor(50, 255, 50, 100));
+        /// <summary>Red price gradient for med items — dark red (cheap) → bright pink (expensive).</summary>
+        public static SKPaint[] LootMedGradient       { get; } = BuildGradient(new SKColor(140, 30, 30),     new SKColor(255, 100, 100));
+        /// <summary>Red price gradient dimmed variant (different floor).</summary>
+        public static SKPaint[] LootMedGradientDimmed { get; } = BuildGradient(new SKColor(140, 30, 30, 80), new SKColor(255, 100, 100, 100));
+
+        private static SKPaint[] BuildGradient(SKColor from, SKColor to, int steps = 20)
+        {
+            var arr = new SKPaint[steps];
+            for (int i = 0; i < steps; i++)
+            {
+                float t = steps > 1 ? i / (float)(steps - 1) : 1f;
+                arr[i] = NewTextPaint(new SKColor(
+                    (byte)(from.Red   + (to.Red   - from.Red)   * t),
+                    (byte)(from.Green + (to.Green - from.Green) * t),
+                    (byte)(from.Blue  + (to.Blue  - from.Blue)  * t),
+                    (byte)(from.Alpha + (to.Alpha - from.Alpha) * t)));
+            }
+            return arr;
+        }
+
         /// <summary>Halo ring drawn around high-value loot dots for visibility.</summary>
         public static SKPaint LootHaloRing { get; } = new()
         {

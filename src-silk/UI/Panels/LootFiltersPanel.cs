@@ -274,6 +274,19 @@ namespace eft_dma_radar.Silk.UI.Panels
                 Config.MarkDirty();
             }
 
+            if (Config.LootShowMeds)
+            {
+                ImGui.Indent(12f);
+                bool medTint = Config.LootMedsRedTint;
+                if (UIControls.ToggleRow("Red Tint", ref medTint,
+                    "Render medical items with a red tint on the radar."))
+                {
+                    Config.LootMedsRedTint = medTint;
+                    Config.MarkDirty();
+                }
+                ImGui.Unindent(12f);
+            }
+
             bool showFood = Config.LootShowFood;
             if (UIControls.ToggleRow("\u2615  Food", ref showFood,
                 "Force food / drink items visible regardless of price."))
@@ -692,6 +705,15 @@ namespace eft_dma_radar.Silk.UI.Panels
                 "Divide price by item grid size.\nUseful for finding high-value-per-slot items."))
             {
                 Config.LootPricePerSlot = pps;
+                Config.MarkDirty();
+            }
+
+            // Price gradient \u2014 shade items by value.
+            bool gradient = Config.LootPriceGradient;
+            if (UIControls.ToggleRow("Price Gradient", ref gradient,
+                "Shade items by value \u2014 bright green = expensive, dim green = cheap.\nMeds get a red gradient when Red Tint is also enabled."))
+            {
+                Config.LootPriceGradient = gradient;
                 Config.MarkDirty();
             }
 

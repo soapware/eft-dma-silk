@@ -91,7 +91,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         /// </summary>
         public void Draw(SKCanvas canvas, SKPoint screenPos, int price, LootFilter.FilterResult result, bool differentFloor = false, float heightDelta = 0f)
         {
-            var paint = GetPaint(result, differentFloor);
+            var paint = GetPaint(result, differentFloor, price);
 
             var cfg = SilkProgram.Config;
             float baseR = Math.Clamp(cfg.LootDotSize, 1.5f, 8f);
@@ -198,21 +198,44 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
             path.Close();
         }
 
-        private static SKPaint GetPaint(LootFilter.FilterResult result, bool differentFloor)
+        private SKPaint GetPaint(LootFilter.FilterResult result, bool differentFloor, int price)
         {
+            var config = SilkProgram.Config;
+            bool isMed = config.LootMedsRedTint && result.CategoryMatch && _item.IsMeds;
+
+            // Price gradient: brightness scales with value (wishlisted items keep cyan)
+            if (config.LootPriceGradient && !result.Wishlisted)
+            {
+                int idx = GetGradientIndex(price, config);
+                if (isMed)
+                    return differentFloor ? SKPaints.LootMedGradientDimmed[idx] : SKPaints.LootMedGradient[idx];
+                return differentFloor ? SKPaints.LootGradientDimmed[idx] : SKPaints.LootGradient[idx];
+            }
+
+            // Solid med tint (gradient off)
+            if (isMed)
+                return differentFloor ? SKPaints.LootMedDimmed : SKPaints.LootMed;
+
+            // Existing tier-based logic
             if (result.Wishlisted)
                 return differentFloor ? SKPaints.LootWishlistDimmed : SKPaints.LootWishlist;
-
-            // Value tiers override the plain "important green" at 2×/5× the threshold
             if (result.Tier >= 3)
                 return differentFloor ? SKPaints.LootTopDimmed : SKPaints.LootTop;
             if (result.Tier == 2)
                 return differentFloor ? SKPaints.LootRareDimmed : SKPaints.LootRare;
-
             if (result.Important)
                 return differentFloor ? SKPaints.LootImportantDimmed : SKPaints.LootImportant;
-
             return differentFloor ? SKPaints.LootNormalDimmed : SKPaints.LootNormal;
+        }
+
+        private static int GetGradientIndex(int price, SilkConfig config)
+        {
+            const int Steps = 20;
+            long maxP = (long)config.LootImportantPrice * 5;
+            long minP = config.LootMinPrice;
+            if (maxP <= minP) maxP = minP + 1;
+            float t = Math.Clamp((float)(price - minP) / (maxP - minP), 0f, 1f);
+            return Math.Min(Steps - 1, (int)(t * Steps));
         }
     }
 }

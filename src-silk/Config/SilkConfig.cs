@@ -646,6 +646,14 @@ namespace eft_dma_radar.Silk.Config
         /// <summary>Always show medical items (bypasses price filter).</summary>
         public bool LootShowMeds { get; set; } = false;
 
+        /// <summary>Apply a red tint to medical items when LootShowMeds is active.</summary>
+        [JsonPropertyName("lootMedsRedTint")]
+        public bool LootMedsRedTint { get; set; } = false;
+
+        /// <summary>Shade loot items green proportional to value; dim at min price, bright at 5× threshold.</summary>
+        [JsonPropertyName("lootPriceGradient")]
+        public bool LootPriceGradient { get; set; } = false;
+
         /// <summary>Always show food/drink items (bypasses price filter).</summary>
         public bool LootShowFood { get; set; } = false;
 

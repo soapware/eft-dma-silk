@@ -120,6 +120,7 @@ namespace eft_dma_radar.Silk.UI
                         // Keyboard navigation for remote-desktop / AnyDesk users.
                         // The focus cursor is also styled via ImGuiCol.NavCursor in ApplyImGuiDarkStyle().
                         io.ConfigFlags |= ImGuiConfigFlags.NavEnableKeyboard;
+                        io.ConfigFlags |= ImGuiConfigFlags.NoMouseCursorChange; // keep OS cursor visible; we manage it
                         LoadImGuiFont(io);
                     }
                 );

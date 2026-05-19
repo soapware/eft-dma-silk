@@ -450,6 +450,7 @@ namespace eft_dma_radar.Silk.DMA
 
         private static void RunStartupLoop()
         {
+            StartupConsole.ResetErrorState(); // ensure each new session prints a fresh error block
             Log.WriteLine("[Memory] Waiting for game process...");
             StartupConsole.PrintStep("Game", "Waiting for EscapeFromTarkov.exe...", StepState.Pending);
             SetState(MemoryState.WaitingForProcess);

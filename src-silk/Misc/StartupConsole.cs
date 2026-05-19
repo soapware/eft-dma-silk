@@ -113,14 +113,54 @@ namespace eft_dma_radar.Silk.Misc
             Console.ResetColor();
         }
 
-        /// <summary>Prints a red error + yellow actionable suggestion on the next line.</summary>
+        // ── Retry-error state (for blinking-dot in-place update) ─────────────────
+        private static bool _errorShown;
+        private static int  _dotIdx;
+        private static readonly string[] _retryDots = [".", "..", "..."];
+
+        /// <summary>
+        /// Resets error state so a fresh error block prints on next call.
+        /// Call at the start of each new game-search session.
+        /// </summary>
+        public static void ResetErrorState()
+        {
+            if (_errorShown)
+                Console.WriteLine(); // move off the partial dot line
+            _errorShown = false;
+            _dotIdx = 0;
+        }
+
+        /// <summary>
+        /// First call: prints the error header + a suggestion line with a dot.
+        /// Subsequent calls: overwrites only the suggestion line with a cycling dot
+        /// so the console doesn't spam the same message on every retry.
+        /// </summary>
         public static void PrintError(string context, string suggestion)
         {
             if (!Log.CleanMode) return;
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"  [!!] {context}");
-            Console.ForegroundColor = ConsoleColor.DarkYellow;
-            Console.WriteLine($"       {"".PadRight(LabelW)}>> {suggestion}");
+
+            string pad = "".PadRight(LabelW);
+
+            if (!_errorShown)
+            {
+                // Print the [!!] header on its own line, then the suggestion without newline
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.WriteLine($"  [!!] {context}");
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write($"       {pad}>> {suggestion} .");
+                _errorShown = true;
+                _dotIdx = 0;
+            }
+            else
+            {
+                // Overwrite the suggestion line with updated dot — \r returns to line start
+                _dotIdx = (_dotIdx + 1) % _retryDots.Length;
+                string dot = _retryDots[_dotIdx];
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                // Extra trailing spaces erase any previously longer dot sequence
+                Console.Write($"\r       {pad}>> {suggestion} {dot}   ");
+            }
+
             Console.ResetColor();
         }
 

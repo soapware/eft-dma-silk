@@ -5,15 +5,7 @@ A DMA radar overlay for **Escape from Tarkov** built on [Silk.NET](https://githu
 > **Based on [eft-dma-radar-silk](https://github.com/HuiTeab/eft-dma-radar-silk) by [HuiTeab](https://github.com/HuiTeab).** Original work © HuiTeab, licensed under the PolyForm Noncommercial License 1.0.0. This fork extends the original with the additions listed below.
 
 ---
-
-## What's new in this fork
-
-### Visual & UI
-
-- **Sidebar readability** — single-word panels now show their full name (Players, Loot, Aimview, Quests, Settings). Primary tab font bumped to 15 px for easier reading at distance or over AnyDesk.
-- **Radar window centering** — window auto-centers on the configured target monitor at launch instead of defaulting to (0, 0).
-- **Per-window icons** — custom icons embedded in the exe (app icon visible in Explorer/taskbar) and applied individually to the radar window, ESP overlay window, and startup screen.
-- **ESP window title** — "ESP Overlay - (F11 Fullscreen)" so the hint is visible without reading docs.
+### QOL fork
 
 ### Status Screen
 
@@ -31,9 +23,9 @@ A DMA radar overlay for **Escape from Tarkov** built on [Silk.NET](https://githu
 - **Panel scroll** — mouse wheel correctly routes to focused ImGui panels instead of always zooming the radar map.
 - **Stash refresh** — the Hideout stash refresh button is now gated to when the player is actually in the hideout, preventing silent failures from the main menu.
 
-### Key Door Blips *(new feature)*
+### Key Door Blips
 
-Scans the local player's Pockets, Backpack, and SecuredContainer for key items on raid entry and again whenever item counts change (pickup/drop), with a 60-second safety refresh. Uses batched DMA scatter reads — no impact on the 8 ms realtime path.
+Scans the local player's Pockets, Backpack, and SecuredContainer for key items on raid entry and again whenever item counts change (pickup/drop), with a 60-second safety refresh. Uses batched DMA scatter reads
 
 - Locked doors for which the player holds the required key are highlighted **cyan** on the radar map instead of red.
 - The ESP overlay shows a cyan circle marker and `"KeyName [Xm]"` world-space label for each matching door.

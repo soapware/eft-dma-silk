@@ -392,6 +392,14 @@ namespace eft_dma_radar.Silk.Config
         [JsonPropertyName("radarWindowY")]
         public int RadarWindowY { get; set; } = -1;
 
+        /// <summary>Restore radar window to borderless fullscreen on next launch.</summary>
+        [JsonPropertyName("radarFullscreen")]
+        public bool RadarFullscreen { get; set; } = false;
+
+        /// <summary>Restore ESP overlay to borderless fullscreen on next launch.</summary>
+        [JsonPropertyName("espFullscreen")]
+        public bool EspFullscreen { get; set; } = false;
+
         // ── Hideout
 
         /// <summary>Enable hideout stash/area reading when entering the hideout scene.</summary>

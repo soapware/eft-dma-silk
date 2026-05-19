@@ -212,6 +212,10 @@ namespace eft_dma_radar.Silk.UI.ESP
                 }
 
                 Log.WriteLine($"[EspWindow] Loaded — {_window!.Size.X}x{_window.Size.Y}");
+
+                // Restore fullscreen if it was active on last close
+                if (Config.EspFullscreen)
+                    ToggleEspBorderlessFullscreen();
             }
             catch (Exception ex)
             {
@@ -230,15 +234,23 @@ namespace eft_dma_radar.Silk.UI.ESP
         {
             _running = false;
 
-            // Persist window position/size (skip if in borderless fullscreen — coords would be monitor-fill)
-            if (!_fakeFullscreen && _window is not null)
+            // Persist fullscreen state + windowed size/position
+            Config.EspFullscreen = _fakeFullscreen;
+            if (_fakeFullscreen && _window is not null)
+            {
+                Config.EspWindowWidth  = _savedFsSize.X;
+                Config.EspWindowHeight = _savedFsSize.Y;
+                Config.EspWindowX      = _savedFsPos.X;
+                Config.EspWindowY      = _savedFsPos.Y;
+            }
+            else if (_window is not null)
             {
                 Config.EspWindowWidth  = _window.Size.X;
                 Config.EspWindowHeight = _window.Size.Y;
                 Config.EspWindowX      = _window.Position.X;
                 Config.EspWindowY      = _window.Position.Y;
-                Config.MarkDirty();
             }
+            Config.MarkDirty();
 
             _input?.Dispose();
             _skSurface?.Dispose();
@@ -283,6 +295,8 @@ namespace eft_dma_radar.Silk.UI.ESP
                 _window.Position     = new Vector2D<int>(mon.Left, mon.Top);
                 _fakeFullscreen      = true;
             }
+            Config.EspFullscreen = _fakeFullscreen;
+            Config.MarkDirty();
         }
 
         private static void CreateSkiaSurface()

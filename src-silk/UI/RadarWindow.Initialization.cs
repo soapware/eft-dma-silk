@@ -38,18 +38,6 @@ namespace eft_dma_radar.Silk.UI
             int winH = Math.Min(Config.WindowHeight, radarMon.Height - TitleBarOffset);
             int centX = radarMon.Left + (radarMon.Width  - winW) / 2;
             int centY = radarMon.Top  + Math.Max(TitleBarOffset, (radarMon.Height - winH) / 2);
-            // Validate saved position — clear it if it no longer falls on any known monitor
-            if (Config.RadarWindowX >= 0 && Config.RadarWindowY >= 0)
-            {
-                bool onScreen = MonitorInfo.GetAllMonitors()
-                    .Any(m => Config.RadarWindowX >= m.Left && Config.RadarWindowX < m.Left + m.Width
-                           && Config.RadarWindowY >= m.Top  && Config.RadarWindowY < m.Top  + m.Height);
-                if (!onScreen)
-                {
-                    Config.RadarWindowX = -1;
-                    Config.RadarWindowY = -1;
-                }
-            }
             int posX = Config.RadarWindowX >= 0 ? Config.RadarWindowX : centX;
             int posY = Config.RadarWindowY >= 0 ? Config.RadarWindowY : centY;
             options.Position = new Vector2D<int>(posX, posY);
@@ -172,6 +160,10 @@ namespace eft_dma_radar.Silk.UI
                 PlayerWatchlistPanel.IsOpen = Config.ShowPlayerWatchlistPanel;
 
                 EspWindow.Open(); // always auto-start — single-launch experience
+
+                // Restore fullscreen if it was active on last close
+                if (Config.RadarFullscreen)
+                    ToggleRadarFullscreen();
 
                 // Auto-open the hideout panel
                 Memory.HideoutEntered += static (_, _) => HideoutPanel.IsOpen = true;

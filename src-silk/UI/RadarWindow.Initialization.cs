@@ -38,7 +38,10 @@ namespace eft_dma_radar.Silk.UI
             int winH = Math.Min(Config.WindowHeight, radarMon.Height - TitleBarOffset);
             int centX = radarMon.Left + (radarMon.Width  - winW) / 2;
             int centY = radarMon.Top  + Math.Max(TitleBarOffset, (radarMon.Height - winH) / 2);
-            options.Position = new Vector2D<int>(centX, centY);
+            // Restore saved position if available, otherwise use centred default
+            int posX = Config.RadarWindowX >= 0 ? Config.RadarWindowX : centX;
+            int posY = Config.RadarWindowY >= 0 ? Config.RadarWindowY : centY;
+            options.Position = new Vector2D<int>(posX, posY);
             options.Size     = new Vector2D<int>(winW, winH);
 
             Log.WriteLine($"[RadarWindow] Creating window on monitor {Config.RadarTargetScreen} ({radarMon.Width}x{radarMon.Height} @ {radarMon.Left},{radarMon.Top})");

@@ -9,19 +9,35 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
 {
     /// <summary>
     /// Scans the local player's Pockets, Backpack, SecuredContainer, and TacticalVest
-    /// for key items every <see cref="ScanIntervalSec"/> seconds, then updates
-    /// <see cref="Interactables.Door.IsKeyHeld"/> on every tracked locked door.
+    /// for key items, then updates <see cref="Interactables.Door.IsKeyHeld"/> on every
+    /// tracked locked door.
     /// <para>
-    /// Called from DoSecondaryWork — self-throttles via internal stopwatch so it is safe
-    /// to call every 100ms. All DMA reads are batched scatter operations.
+    /// <b>Scan triggers:</b>
+    /// <list type="bullet">
+    ///   <item>Immediately on first call after raid entry.</item>
+    ///   <item>When any grid item count changes (checked every 500 ms via a single cheap scatter).</item>
+    ///   <item>Every 60 seconds as a safety fallback (catches key-swap: drop key A, pick up key B
+    ///     in the same tick — counts stay equal but the key set changed).</item>
+    /// </list>
     /// </para>
+    /// Called from DoSecondaryWork (100 ms registration-worker tick). All DMA work is
+    /// batched scatter operations; the 500 ms count poll is a single scatter round with
+    /// 3–6 int reads.
     /// </summary>
     internal sealed class KeyInventoryScanner
     {
-        private const int ScanIntervalSec = 30;
-        private const int StrBytes = 128; // 64 UTF-16 chars — covers all BSG IDs and slot names
+        private const int FallbackSec  = 60;  // safety full-scan interval
+        private const int QuickCheckMs = 500; // item-count poll interval
 
-        private readonly Stopwatch _sw = new(); // not started — first Update() fires immediately
+        private const int StrBytes = 128; // 64 UTF-16 chars — covers BSG IDs and slot names
+
+        private bool _initialized;
+        private readonly Stopwatch _fallbackSw   = new();
+        private readonly Stopwatch _quickCheckSw = new();
+
+        // Populated by FullScan; used by CountsChanged()
+        private readonly List<ulong> _cachedCollPtrs = new(8);
+        private readonly List<int>   _cachedCounts   = new(8);
 
         private static readonly FrozenSet<string> TargetSlots =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -29,17 +45,67 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
             .ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
-        /// Check timer and run scan if due. Safe to call every registration-worker tick.
+        /// Call every registration-worker tick. Self-throttles internally.
         /// </summary>
         public void Update(ulong playerBase, IReadOnlyList<Interactables.Door> doors)
         {
-            if (_sw.IsRunning && _sw.Elapsed.TotalSeconds < ScanIntervalSec) return;
-            _sw.Restart();
-            try { ScanAndMark(playerBase, doors); }
+            // First call after raid entry — scan immediately
+            if (!_initialized)
+            {
+                RunFullScan(playerBase, doors);
+                _initialized = true;
+                _fallbackSw.Restart();
+                _quickCheckSw.Restart();
+                return;
+            }
+
+            // Rate-limit the count poll to every 500 ms
+            if (_quickCheckSw.ElapsedMilliseconds < QuickCheckMs) return;
+            _quickCheckSw.Restart();
+
+            // Trigger full scan if counts changed OR fallback interval elapsed
+            if (CountsChanged() || _fallbackSw.Elapsed.TotalSeconds >= FallbackSec)
+            {
+                RunFullScan(playerBase, doors);
+                _fallbackSw.Restart();
+            }
+        }
+
+        // ── Count poll — 1 scatter round, 3–6 int reads ──────────────────────────
+
+        private bool CountsChanged()
+        {
+            if (_cachedCollPtrs.Count == 0) return true;
+
+            try
+            {
+                using var r = Memory.GetScatter(VmmFlags.NOCACHE);
+                for (int i = 0; i < _cachedCollPtrs.Count; i++)
+                    r.PrepareReadValue<int>(_cachedCollPtrs[i] + 0x18);
+                r.Execute();
+
+                for (int i = 0; i < _cachedCollPtrs.Count; i++)
+                {
+                    if (!r.ReadValue<int>(_cachedCollPtrs[i] + 0x18, out var cnt) || cnt != _cachedCounts[i])
+                        return true;
+                }
+                return false;
+            }
+            catch
+            {
+                return true; // DMA error — assume changed, trigger full scan
+            }
+        }
+
+        // ── Full scan — 12 scatter rounds ────────────────────────────────────────
+
+        private void RunFullScan(ulong playerBase, IReadOnlyList<Interactables.Door> doors)
+        {
+            try { FullScan(playerBase, doors); }
             catch { /* silently skip on transient DMA error — stale IsKeyHeld values are harmless */ }
         }
 
-        private static void ScanAndMark(ulong playerBase, IReadOnlyList<Interactables.Door> doors)
+        private void FullScan(ulong playerBase, IReadOnlyList<Interactables.Door> doors)
         {
             // ── Walk inventory pointer chain ──────────────────────────────────────────
             if (!Memory.TryReadPtr(playerBase + Offsets.Player._inventoryController, out var invCtrl)
@@ -60,8 +126,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
                 int n = slots.Count;
                 if (n == 0) return;
 
-                var namePtrs  = new ulong[n];
-                var contPtrs  = new ulong[n]; // ContainedItem (LootItem) per slot
+                var namePtrs = new ulong[n];
+                var contPtrs = new ulong[n];
 
                 // ── R1: Slot.ID + Slot.ContainedItem ptrs ────────────────────────────
                 using (var r1 = Memory.GetScatter(VmmFlags.NOCACHE))
@@ -132,7 +198,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
                 }
                 if (gridSlotAddrs.Count == 0) return;
 
-                // ── R5: Grid ptrs from the array ─────────────────────────────────────
+                // ── R5: Grid ptrs ─────────────────────────────────────────────────────
                 var gridPtrs = new ulong[gridSlotAddrs.Count];
                 using (var r5 = Memory.GetScatter(VmmFlags.NOCACHE))
                 {
@@ -156,7 +222,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
                             r6.ReadValue<ulong>(gridPtrs[i] + Offsets.Grids.ContainedItems, out collPtrs[i]);
                 }
 
-                // ── R7: item count + backing-array ptr from each ItemCollection ────────
+                // ── R7: item count + backing-array ptr ────────────────────────────────
                 // ItemCollection layout: count at +0x18, array ptr at +0x20
                 var itemCounts = new int[collPtrs.Length];
                 var arrayPtrs  = new ulong[collPtrs.Length];
@@ -177,7 +243,19 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
                     }
                 }
 
-                // ── R8: InteractiveLootItem ptrs from each grid's backing array ────────
+                // ── Update cache for count-change polling ─────────────────────────────
+                _cachedCollPtrs.Clear();
+                _cachedCounts.Clear();
+                for (int i = 0; i < collPtrs.Length; i++)
+                {
+                    if (collPtrs[i].IsValidVirtualAddress())
+                    {
+                        _cachedCollPtrs.Add(collPtrs[i]);
+                        _cachedCounts.Add(itemCounts[i]);
+                    }
+                }
+
+                // ── R8: InteractiveLootItem ptrs ──────────────────────────────────────
                 var iLootPtrs = new List<ulong>(64);
                 using (var r8 = Memory.GetScatter(VmmFlags.NOCACHE))
                 {
@@ -200,7 +278,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
                         }
                     }
                 }
-                if (iLootPtrs.Count == 0) return;
+                if (iLootPtrs.Count == 0) { ClearDoorFlags(doors); return; }
 
                 // ── R9: LootItem ptrs via InteractiveLootItem.Item (+0xF0) ────────────
                 var lootPtrs = new List<ulong>(iLootPtrs.Count);
@@ -215,9 +293,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
                             lootPtrs.Add(p);
                     }
                 }
-                if (lootPtrs.Count == 0) return;
+                if (lootPtrs.Count == 0) { ClearDoorFlags(doors); return; }
 
-                // ── R10: Template ptrs (LootItem + 0x60) ─────────────────────────────
+                // ── R10: Template ptrs ────────────────────────────────────────────────
                 var templatePtrs = new ulong[lootPtrs.Count];
                 using (var r10 = Memory.GetScatter(VmmFlags.NOCACHE))
                 {
@@ -228,7 +306,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
                         r10.ReadValue<ulong>(lootPtrs[i] + Offsets.LootItem.Template, out templatePtrs[i]);
                 }
 
-                // ── R11: MongoID structs (ItemTemplate + 0xE0) ───────────────────────
+                // ── R11: MongoID structs ──────────────────────────────────────────────
                 var mongoIds = new Types.MongoID[templatePtrs.Length];
                 using (var r11 = Memory.GetScatter(VmmFlags.NOCACHE))
                 {
@@ -262,6 +340,12 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
                         door.IsKeyHeld = door.KeyId is { } kid && heldIds.Contains(kid);
                 }
             }
+        }
+
+        private static void ClearDoorFlags(IReadOnlyList<Interactables.Door> doors)
+        {
+            foreach (var door in doors)
+                door.IsKeyHeld = false;
         }
     }
 }

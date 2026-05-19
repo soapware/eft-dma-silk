@@ -385,6 +385,13 @@ namespace eft_dma_radar.Silk.Config
         /// <summary>Saved ESP window Y position. -1 = auto-center on target monitor.</summary>
         public int EspWindowY      { get; set; } = -1;
 
+        /// <summary>Saved radar window X position. -1 = auto-center on target monitor.</summary>
+        [JsonPropertyName("radarWindowX")]
+        public int RadarWindowX { get; set; } = -1;
+        /// <summary>Saved radar window Y position. -1 = auto-center on target monitor.</summary>
+        [JsonPropertyName("radarWindowY")]
+        public int RadarWindowY { get; set; } = -1;
+
         // ── Hideout
 
         /// <summary>Enable hideout stash/area reading when entering the hideout scene.</summary>

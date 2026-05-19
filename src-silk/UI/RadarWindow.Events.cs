@@ -19,11 +19,13 @@ namespace eft_dma_radar.Silk.UI
 
         private static void OnClosing()
         {
-            // Persist window size (skip if in fake fullscreen — would save FS coords)
+            // Persist window size + position (skip if in fake fullscreen — would save FS coords)
             if (!_fakeFullscreen)
             {
                 Config.WindowWidth  = _window.Size.X;
                 Config.WindowHeight = _window.Size.Y;
+                Config.RadarWindowX = _window.Position.X;
+                Config.RadarWindowY = _window.Position.Y;
                 // WindowMaximized intentionally NOT persisted — restoring Maximized on next
                 // launch removes the title bar and makes the window appear stuck/unmovable.
             }

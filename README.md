@@ -18,15 +18,22 @@ A DMA radar overlay for **Escape from Tarkov** built on [Silk.NET](https://githu
 ### Status Screen
 
 - **State-aware messaging** — startup sub-line reads `[ INITIALIZING DMA INTERFACE ]` while the DMA card is connecting, then switches to `[ WAITING FOR TARKOV ]` once the card is live and the radar is polling for the game process.
-- **DMA stats box** — Skia-drawn box below the banner shows HW MAX throughput and fault/issue counter for the current session.
+- **DMA stats box** — Skia-drawn box below the banner shows live read throughput (MB/s) with a red→yellow→green gradient and a cumulative fault counter for the session.
 
 ### Status Bar
 
 - **DMA speed gradient** — the `### MB/s` value in the DMA chip colors red → yellow → green based on current throughput relative to the hardware ceiling. The separator and RT count stay neutral blue.
 
+### Quality of Life
+
+- **Window position memory** — radar and ESP windows remember their last position and monitor across sessions; positions are restored automatically on next launch.
+- **UI scale live** — adjusting `UIScale` in Settings takes effect immediately with no restart required.
+- **Panel scroll** — mouse wheel correctly routes to focused ImGui panels instead of always zooming the radar map.
+- **Stash refresh** — the Hideout stash refresh button is now gated to when the player is actually in the hideout, preventing silent failures from the main menu.
+
 ### Key Door Blips *(new feature)*
 
-Scans the local player's Pockets, Backpack, and SecuredContainer for key items every 30 seconds using batched DMA scatter reads (no impact on the 8 ms realtime path).
+Scans the local player's Pockets, Backpack, and SecuredContainer for key items on raid entry and again whenever item counts change (pickup/drop), with a 60-second safety refresh. Uses batched DMA scatter reads — no impact on the 8 ms realtime path.
 
 - Locked doors for which the player holds the required key are highlighted **cyan** on the radar map instead of red.
 - The ESP overlay shows a cyan circle marker and `"KeyName [Xm]"` world-space label for each matching door.

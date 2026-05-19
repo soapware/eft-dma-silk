@@ -115,12 +115,43 @@ namespace eft_dma_radar.Silk.UI
                     }
                     DrawStatusMessage(canvas, statusMsg, scale, animated: true);
                 }
+
+                // Software cursor — drawn last so it's always on top regardless of state.
+                // OBS-proof: painted into the Skia framebuffer, not via hardware cursor API.
+                DrawSoftCursor(canvas);
             }
             finally
             {
                 canvas.Restore();
                 _grContext.Flush();
             }
+        }
+
+        private static void DrawSoftCursor(SKCanvas canvas)
+        {
+            float x = _lastMousePosition.X;
+            float y = _lastMousePosition.Y;
+            if (x <= 0f && y <= 0f) return; // not yet moved
+
+            // Draw in physical pixel space — bypass UIScale so cursor is always the same size.
+            int save = canvas.Save();
+            canvas.ResetMatrix();
+
+            // Classic Windows-style arrow cursor (hot spot = top-left tip).
+            _cursorPath.Reset();
+            _cursorPath.MoveTo(x,       y);        // tip
+            _cursorPath.LineTo(x,       y + 16f);  // left edge bottom
+            _cursorPath.LineTo(x + 4f,  y + 11f);  // inner notch left
+            _cursorPath.LineTo(x + 9f,  y + 18f);  // arm bottom-left
+            _cursorPath.LineTo(x + 11f, y + 17f);  // arm bottom-right
+            _cursorPath.LineTo(x + 6f,  y + 10f);  // inner notch right
+            _cursorPath.LineTo(x + 11f, y + 10f);  // arm top-right
+            _cursorPath.Close();
+
+            canvas.DrawPath(_cursorPath, SKPaints.SoftCursorOutline);
+            canvas.DrawPath(_cursorPath, SKPaints.SoftCursorFill);
+
+            canvas.RestoreToCount(save);
         }
 
         private static void DrawRadar(SKCanvas canvas, Player localPlayer, IRadarMap map, float scale)

@@ -66,6 +66,8 @@ namespace eft_dma_radar.Silk.DMA
         public static ulong UnityBase { get; private set; }
         public static ulong GOM { get; private set; }
         public static ulong GameAssemblyBase { get; private set; }
+        /// <summary>EFT game version read from PE version resource (e.g. "1.0.4.9.45133").</summary>
+        public static string GameVersion { get; private set; } = string.Empty;
         public static bool Ready => _state is MemoryState.ProcessFound or MemoryState.InRaid or MemoryState.InHideout;
         public static bool InRaid => _state is MemoryState.InRaid;
         public static bool InHideout => _state is MemoryState.InHideout;
@@ -131,6 +133,7 @@ namespace eft_dma_radar.Silk.DMA
             UnityBase = default;
             GOM = default;
             GameAssemblyBase = default;
+            GameVersion = string.Empty;
             _pid = default;
             GameObjectManager.ResetCachedAddresses();
             MatchingProgressResolver.Reset();
@@ -494,7 +497,9 @@ namespace eft_dma_radar.Silk.DMA
                     if (!modulesReady)
                         throw new Exception("Modules failed to load after retries.");
 
-                    StartupConsole.PrintStep("Game", $"Found (PID {_pid})", StepState.Ok);
+                    GameVersion = ReadGameVersion();
+                    var versionTag = string.IsNullOrEmpty(GameVersion) ? string.Empty : $" v{GameVersion}";
+                    StartupConsole.PrintStep("Game", $"Found (PID {_pid}){versionTag}", StepState.Ok);
 
                     // Wait for EFT's IL2CPP runtime to finish initializing the TypeInfoTable.
                     // The game populates it a few seconds after its modules load; probing it
@@ -709,6 +714,73 @@ namespace eft_dma_radar.Silk.DMA
             if (!VmmOrThrow().PidGetFromName(ProcessName, out uint pid))
                 throw new Exception($"Process '{ProcessName}' not found.");
             _pid = pid;
+        }
+
+        /// <summary>
+        /// Reads the VS_VERSIONINFO PE resource from EscapeFromTarkov.exe in memory and returns
+        /// the file version string (e.g. "1.0.4.9.45133"), or empty string on any failure.
+        /// </summary>
+        private static string ReadGameVersion()
+        {
+            try
+            {
+                var vmm = VmmOrThrow();
+                var exeBase = vmm.ProcessGetModuleBase(_pid, "EscapeFromTarkov.exe");
+                if (exeBase == 0) return string.Empty;
+
+                // PE32+ layout:
+                // exeBase+0x3C = e_lfanew → offset to NT headers
+                // NT+24 = OptionalHeader64 start; DataDirectory[2] (resource) at +112+16 = +128
+                var eLfanew     = ReadValue<uint>(exeBase + 0x3C, false);
+                var ntBase      = exeBase + eLfanew;
+                var resourceRva = ReadValue<uint>(ntBase + 152, false);
+                if (resourceRva == 0) return string.Empty;
+
+                var resDir = exeBase + resourceRva;
+
+                // Root resource directory header (+12 = NamedCount, +14 = IdCount)
+                var namedCount = ReadValue<ushort>(resDir + 12, false);
+                var idCount    = ReadValue<ushort>(resDir + 14, false);
+                ulong versionDataRva = 0;
+
+                // Walk type entries (8 bytes each, starting at resDir+16)
+                for (int i = 0; i < namedCount + idCount && i < 64; i++)
+                {
+                    var eBase   = resDir + 16 + (ulong)(i * 8);
+                    var nameId  = ReadValue<uint>(eBase, false);
+                    var offData = ReadValue<uint>(eBase + 4, false);
+
+                    if ((nameId & 0x80000000) != 0 || nameId != 16) continue; // skip named / non-version (RT_VERSION=16)
+                    if ((offData & 0x80000000) == 0) break;                    // expect subdirectory
+
+                    // Level 2: name subdir — take first entry's OffsetToData
+                    var sub2 = resDir + (offData & 0x7FFFFFFF);
+                    var off2 = ReadValue<uint>(sub2 + 16 + 4, false);
+                    if ((off2 & 0x80000000) == 0) break;
+
+                    // Level 3: language subdir — take first entry's OffsetToData
+                    var sub3 = resDir + (off2 & 0x7FFFFFFF);
+                    var off3 = ReadValue<uint>(sub3 + 16 + 4, false);
+                    if ((off3 & 0x80000000) != 0) break; // data entry must NOT have subdir flag
+
+                    // IMAGE_RESOURCE_DATA_ENTRY: DataRva at offset 0
+                    versionDataRva = ReadValue<uint>(resDir + off3, false);
+                    break;
+                }
+
+                if (versionDataRva == 0) return string.Empty;
+
+                // VS_VERSIONINFO: 6-byte header + L"VS_VERSION_INFO\0" (32 bytes UTF-16) + 2-byte pad = 40 bytes
+                // VS_FIXEDFILEINFO at +40: dwSignature(+0), dwStrucVersion(+4), dwFileVersionMS(+8), dwFileVersionLS(+12)
+                var vBase = exeBase + versionDataRva;
+                var sig   = ReadValue<uint>(vBase + 40, false);
+                if (sig != 0xFEEF04BD) return string.Empty;
+
+                var ms = ReadValue<uint>(vBase + 48, false);
+                var ls = ReadValue<uint>(vBase + 52, false);
+                return $"{ms >> 16}.{ms & 0xFFFF}.{ls >> 16}.{ls & 0xFFFF}";
+            }
+            catch { return string.Empty; }
         }
 
         private static void LoadModules()

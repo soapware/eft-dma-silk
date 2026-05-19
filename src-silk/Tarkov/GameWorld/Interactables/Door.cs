@@ -67,6 +67,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Interactables
                 return false;
 
             var config = SilkProgram.Config;
+
+            // Key-door mode: show only doors the local player holds a key for
+            if (config.ShowKeyDoors)
+                return IsKeyHeld;
+
             if (DoorState == EDoorState.Locked && !config.ShowLockedDoors)
                 return false;
             if (DoorState != EDoorState.Locked && !config.ShowUnlockedDoors)

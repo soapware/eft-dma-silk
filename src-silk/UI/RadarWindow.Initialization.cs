@@ -47,6 +47,8 @@ namespace eft_dma_radar.Silk.UI
 
             _window = SilkWindow.Create(options);
             _window.Load += OnLoad;
+            Memory.GameStarted += (_, _) => _window.Title = SilkProgram.Name;
+            Memory.GameStopped += (_, _) => _window.Title = "EFT (Silk.NET)";
 
             Log.WriteLine("[RadarWindow] Initialize complete, window created.");
         }

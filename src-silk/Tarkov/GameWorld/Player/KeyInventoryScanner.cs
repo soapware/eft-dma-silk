@@ -295,15 +295,126 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
                 }
                 if (lootPtrs.Count == 0) { ClearDoorFlags(doors); return; }
 
-                // ── R10: Template ptrs ────────────────────────────────────────────────
-                var templatePtrs = new ulong[lootPtrs.Count];
-                using (var r10 = Memory.GetScatter(VmmFlags.NOCACHE))
+                // ── Deep scan: items inside key holders / key tools / wallets ─────────
+                // For each first-level item, try reading CompoundItem.Grids.
+                // Valid grids → CompoundItem (key holder) → scan its sub-items.
+                var allLootPtrs = new List<ulong>(lootPtrs);
+
+                var subGridArrPtrs = new ulong[lootPtrs.Count];
+                using (var rd1 = Memory.GetScatter(VmmFlags.NOCACHE))
                 {
                     for (int i = 0; i < lootPtrs.Count; i++)
-                        r10.PrepareReadPtr(lootPtrs[i] + Offsets.LootItem.Template);
-                    r10.Execute();
+                        rd1.PrepareReadPtr(lootPtrs[i] + Offsets.CompoundItem.Grids);
+                    rd1.Execute();
                     for (int i = 0; i < lootPtrs.Count; i++)
-                        r10.ReadValue<ulong>(lootPtrs[i] + Offsets.LootItem.Template, out templatePtrs[i]);
+                        rd1.ReadValue<ulong>(lootPtrs[i] + Offsets.CompoundItem.Grids, out subGridArrPtrs[i]);
+                }
+
+                var subGridSlotAddrs = new List<ulong>(16);
+                using (var rd2 = Memory.GetScatter(VmmFlags.NOCACHE))
+                {
+                    for (int i = 0; i < subGridArrPtrs.Length; i++)
+                        if (subGridArrPtrs[i].IsValidVirtualAddress())
+                            rd2.PrepareReadValue<int>(subGridArrPtrs[i] + 0x18);
+                    rd2.Execute();
+                    for (int i = 0; i < subGridArrPtrs.Length; i++)
+                    {
+                        if (!subGridArrPtrs[i].IsValidVirtualAddress()) continue;
+                        if (rd2.ReadValue<int>(subGridArrPtrs[i] + 0x18, out var cnt) && cnt > 0)
+                            for (int g = 0; g < Math.Min(cnt, 8); g++)
+                                subGridSlotAddrs.Add(subGridArrPtrs[i] + 0x20 + (ulong)(g * 8));
+                    }
+                }
+
+                if (subGridSlotAddrs.Count > 0)
+                {
+                    var subGridPtrs = new ulong[subGridSlotAddrs.Count];
+                    using (var rd3 = Memory.GetScatter(VmmFlags.NOCACHE))
+                    {
+                        for (int i = 0; i < subGridSlotAddrs.Count; i++)
+                            rd3.PrepareReadPtr(subGridSlotAddrs[i]);
+                        rd3.Execute();
+                        for (int i = 0; i < subGridSlotAddrs.Count; i++)
+                            rd3.ReadValue<ulong>(subGridSlotAddrs[i], out subGridPtrs[i]);
+                    }
+
+                    var subCollPtrs = new ulong[subGridPtrs.Length];
+                    using (var rd4 = Memory.GetScatter(VmmFlags.NOCACHE))
+                    {
+                        for (int i = 0; i < subGridPtrs.Length; i++)
+                            if (subGridPtrs[i].IsValidVirtualAddress())
+                                rd4.PrepareReadPtr(subGridPtrs[i] + Offsets.Grids.ContainedItems);
+                        rd4.Execute();
+                        for (int i = 0; i < subGridPtrs.Length; i++)
+                            if (subGridPtrs[i].IsValidVirtualAddress())
+                                rd4.ReadValue<ulong>(subGridPtrs[i] + Offsets.Grids.ContainedItems, out subCollPtrs[i]);
+                    }
+
+                    var subItemCounts = new int[subCollPtrs.Length];
+                    var subArrayPtrs  = new ulong[subCollPtrs.Length];
+                    using (var rd5 = Memory.GetScatter(VmmFlags.NOCACHE))
+                    {
+                        for (int i = 0; i < subCollPtrs.Length; i++)
+                        {
+                            if (!subCollPtrs[i].IsValidVirtualAddress()) continue;
+                            rd5.PrepareReadValue<int>(subCollPtrs[i] + 0x18);
+                            rd5.PrepareReadValue<ulong>(subCollPtrs[i] + 0x20);
+                        }
+                        rd5.Execute();
+                        for (int i = 0; i < subCollPtrs.Length; i++)
+                        {
+                            if (!subCollPtrs[i].IsValidVirtualAddress()) continue;
+                            rd5.ReadValue<int>(subCollPtrs[i] + 0x18, out subItemCounts[i]);
+                            rd5.ReadValue<ulong>(subCollPtrs[i] + 0x20, out subArrayPtrs[i]);
+                        }
+                    }
+
+                    var subILootPtrs = new List<ulong>(32);
+                    using (var rd6 = Memory.GetScatter(VmmFlags.NOCACHE))
+                    {
+                        for (int i = 0; i < subArrayPtrs.Length; i++)
+                        {
+                            if (!subArrayPtrs[i].IsValidVirtualAddress() || subItemCounts[i] <= 0) continue;
+                            int cnt = Math.Min(subItemCounts[i], 20);
+                            for (int j = 0; j < cnt; j++)
+                                rd6.PrepareReadPtr(subArrayPtrs[i] + 0x20 + (ulong)(j * 8));
+                        }
+                        rd6.Execute();
+                        for (int i = 0; i < subArrayPtrs.Length; i++)
+                        {
+                            if (!subArrayPtrs[i].IsValidVirtualAddress() || subItemCounts[i] <= 0) continue;
+                            int cnt = Math.Min(subItemCounts[i], 20);
+                            for (int j = 0; j < cnt; j++)
+                            {
+                                if (rd6.ReadValue<ulong>(subArrayPtrs[i] + 0x20 + (ulong)(j * 8), out var p) && p.IsValidVirtualAddress())
+                                    subILootPtrs.Add(p);
+                            }
+                        }
+                    }
+
+                    if (subILootPtrs.Count > 0)
+                    {
+                        using var rd7 = Memory.GetScatter(VmmFlags.NOCACHE);
+                        for (int i = 0; i < subILootPtrs.Count; i++)
+                            rd7.PrepareReadPtr(subILootPtrs[i] + Offsets.InteractiveLootItem.Item);
+                        rd7.Execute();
+                        for (int i = 0; i < subILootPtrs.Count; i++)
+                        {
+                            if (rd7.ReadValue<ulong>(subILootPtrs[i] + Offsets.InteractiveLootItem.Item, out var p) && p.IsValidVirtualAddress())
+                                allLootPtrs.Add(p);
+                        }
+                    }
+                }
+
+                // ── R10: Template ptrs ────────────────────────────────────────────────
+                var templatePtrs = new ulong[allLootPtrs.Count];
+                using (var r10 = Memory.GetScatter(VmmFlags.NOCACHE))
+                {
+                    for (int i = 0; i < allLootPtrs.Count; i++)
+                        r10.PrepareReadPtr(allLootPtrs[i] + Offsets.LootItem.Template);
+                    r10.Execute();
+                    for (int i = 0; i < allLootPtrs.Count; i++)
+                        r10.ReadValue<ulong>(allLootPtrs[i] + Offsets.LootItem.Template, out templatePtrs[i]);
                 }
 
                 // ── R11: MongoID structs ──────────────────────────────────────────────

@@ -19,7 +19,10 @@ namespace eft_dma_radar.Silk
 {
     internal static partial class SilkProgram
     {
-        internal const string Name = "EFT (Silk.NET)";
+        internal static string Name =>
+            string.IsNullOrEmpty(Memory.GameVersion)
+                ? "EFT (Silk.NET)"
+                : $"EFT ({Memory.GameVersion}) Silk.NET";
 
         internal static MemoryState State => Memory.State;
 

@@ -30,7 +30,7 @@ namespace eft_dma_radar.Silk.Misc
         public static void PrintHeader()
         {
             if (!Log.CleanMode) return;
-            Console.Title = "EFT DMA Radar — Silk.NET";
+            Console.Title = "EFT (Silk.NET) - Console";
 
             const string title = "EFT DMA Radar  |  Silk.NET Edition  (soapware)";
             string bar = new string('─', title.Length + 4); // ─ repeated, 2-space pad each side

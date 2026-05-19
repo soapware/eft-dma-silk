@@ -211,18 +211,18 @@ namespace eft_dma_radar.Silk.DMA
                 // Fast path: try to connect without warm-up first (saves 22s on ready hardware)
                 bool connected = false;
                 Log.WriteLine("[Memory] Attempting fast VMM connection (no warm-up)...");
-                StartupConsole.PrintStep("DMA Card", "Connecting...", StepState.Pending);
+                StartupConsole.PrintStep("Xilinx", "Connecting...", StepState.Pending);
                 try
                 {
                     _vmm = new Vmm([.. args]);
                     Log.WriteLine("[Memory] VMM connected immediately — no warm-up needed.");
-                    StartupConsole.PrintStep("DMA Card", "Connected", StepState.Ok);
+                    StartupConsole.PrintStep("Xilinx", "Connected", StepState.Ok);
                     connected = true;
                 }
                 catch (VmmSharpEx.VmmException)
                 {
                     Log.WriteLine("[Memory] Fast path failed — running FT601 warm-up...");
-                    StartupConsole.PrintStep("DMA Card", "USB warm-up required (~10s)...", StepState.Pending);
+                    StartupConsole.PrintStep("Xilinx", "USB warm-up required (~10s)...", StepState.Pending);
                     WarmUpFt601(config.DeviceStr);
                 }
 

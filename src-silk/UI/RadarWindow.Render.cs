@@ -5,7 +5,6 @@
 using eft_dma_radar.Silk.Tarkov;
 using eft_dma_radar.Silk.Tarkov.Unity.IL2CPP;
 using EftPlayer = eft_dma_radar.Silk.Tarkov.GameWorld.Player.Player;
-using Silk.NET.Input;
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
 
@@ -17,11 +16,6 @@ namespace eft_dma_radar.Silk.UI
         {
             if (_grContext is null || _skSurface is null)
                 return;
-
-            // GLFW can restore a stored Hidden cursor state on focus events; force Normal
-            // every frame so it can never stick regardless of what GLFW or ImGui does.
-            foreach (var mouse in _input.Mice)
-                mouse.Cursor.CursorMode = CursorMode.Normal;
 
             try
             {

@@ -79,7 +79,7 @@ namespace eft_dma_radar.Silk.Misc
             var color = GetAttemptColor(attempt);
 
             Console.ForegroundColor = ConsoleColor.DarkGray;
-            Console.Write($"  [  ] {"DMA Card".PadRight(LabelW)}");
+            Console.Write($"  [  ] {"Xilinx".PadRight(LabelW)}");
             Console.ForegroundColor = color;
 
             if (connected)

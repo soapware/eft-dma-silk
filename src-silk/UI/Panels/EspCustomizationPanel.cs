@@ -24,7 +24,7 @@ namespace eft_dma_radar.Silk.UI.Panels
         {
             if (!IsOpen) return;
 
-            ImGui.SetNextWindowSize(new Vector2(520f * UIScale, 480f * UIScale), ImGuiCond.FirstUseEver);
+            ImGui.SetNextWindowSize(new Vector2(480f * UIScale, 460f * UIScale), ImGuiCond.FirstUseEver);
             bool open = IsOpen;
             ImGui.Begin("ESP Visuals", ref open);
             IsOpen = open;
@@ -43,48 +43,43 @@ namespace eft_dma_radar.Silk.UI.Panels
 
         private static void DrawPlayersTab()
         {
-            UIControls.Section("Overlay");
+            SectionHeader("Overlay");
 
             bool en = Config.EspShowPlayers;
-            if (UIControls.ToggleRow("Enabled", ref en, "Master toggle — show/hide all player ESP"))
-            { Config.EspShowPlayers = en; Config.MarkDirty(); }
+            if (ImGui.Checkbox("##en", ref en)) { Config.EspShowPlayers = en; Config.MarkDirty(); }
+            ImGui.SameLine(); ImGui.TextUnformatted("Enabled");
+            Tip("Master toggle — show/hide all player ESP");
 
-            // Name
             bool showName = Config.EspShowName; uint nameClr = Config.EspNameColor;
             if (ColorFeatureRow("Name", ref showName, ref nameClr, "Name label above the bounding box"))
             { Config.EspShowName = showName; Config.EspNameColor = nameClr; Config.MarkDirty(); }
 
-            // Box (no toggle, just color override)
             uint boxClr = Config.EspBoxColorOvr;
             if (ColorOnlyRow("Box", ref boxClr, "Box outline color (alpha=0 → per-type player color)"))
             { Config.EspBoxColorOvr = boxClr; Config.MarkDirty(); }
 
-            // Health
             bool showHealth = Config.EspShowHealth; uint healthHi = Config.EspHealthColHigh;
             if (ColorFeatureRow("Health", ref showHealth, ref healthHi, "Health bar (high-health color)"))
             { Config.EspShowHealth = showHealth; Config.EspHealthColHigh = healthHi; Config.MarkDirty(); }
 
-            // Health number
             bool showHNum = Config.EspShowHealthNum;
-            if (UIControls.ToggleRow("Health Number", ref showHNum, "Show HP % number on the health bar"))
-            { Config.EspShowHealthNum = showHNum; Config.MarkDirty(); }
+            if (ImGui.Checkbox("##hn", ref showHNum)) { Config.EspShowHealthNum = showHNum; Config.MarkDirty(); }
+            ImGui.SameLine(); ImGui.TextUnformatted("Health Number");
+            Tip("Show HP % number on the health bar");
 
-            // Weapon
             bool showWeapon = Config.EspShowWeapon; uint weapClr = Config.EspWeaponColor;
             if (ColorFeatureRow("Weapon", ref showWeapon, ref weapClr, "Current weapon short name label"))
             { Config.EspShowWeapon = showWeapon; Config.EspWeaponColor = weapClr; Config.MarkDirty(); }
 
-            // Highlight target
             bool showHL = Config.EspShowHighlight; uint hlClr = Config.EspHighlightColor;
             if (ColorFeatureRow("Highlight Target", ref showHL, ref hlClr, "Tint on current aim target"))
             { Config.EspShowHighlight = showHL; Config.EspHighlightColor = hlClr; Config.MarkDirty(); }
 
-            // Distance label
             bool showDist = Config.EspShowDistLabel; uint distClr = Config.EspDistColor;
-            if (ColorFeatureRow("Distance Label", ref showDist, ref distClr, "Distance in metres below the box"))
+            if (ColorFeatureRow("Distance Label", ref showDist, ref distClr, "Distance in metres below box"))
             { Config.EspShowDistLabel = showDist; Config.EspDistColor = distClr; Config.MarkDirty(); }
 
-            UIControls.Section("Range");
+            SectionHeader("Range");
 
             float d = Config.EspPlayerDistance;
             if (UIControls.StepperFloat("Max Distance", ref d, 10f, 2000f, 25f, "{0:0} m",
@@ -96,13 +91,13 @@ namespace eft_dma_radar.Silk.UI.Panels
 
         private static void DrawIndicatorsTab()
         {
-            UIControls.Section("Settings");
+            SectionHeader("Settings");
 
             int fi = Config.EspNameFontIdx;
             if (UIControls.ComboRow("Name Font", ref fi, _fontNames, "Font used for player name labels"))
             { Config.EspNameFontIdx = fi; Config.MarkDirty(); }
 
-            UIControls.Section("Health Colors");
+            SectionHeader("Health Colors");
 
             uint hh = Config.EspHealthColHigh;
             uint hm = Config.EspHealthColMid;
@@ -114,7 +109,7 @@ namespace eft_dma_radar.Silk.UI.Panels
             if (ColorOnlyRow("Low   (< 25 %)",  ref hl, "Health bar fill when HP < 25%"))
             { Config.EspHealthColLow = hl; Config.MarkDirty(); }
 
-            UIControls.Section("Flags");
+            SectionHeader("Flags");
 
             bool fd = Config.EspFlagDistance; uint fdClr = Config.EspFlagDistColor;
             if (ColorFeatureRow("Distance", ref fd, ref fdClr, "Append distance next to name"))
@@ -127,48 +122,38 @@ namespace eft_dma_radar.Silk.UI.Panels
 
         // ── Helpers ───────────────────────────────────────────────────────────────
 
-        // Returns true if anything changed
+        // Checkbox on left, label, color swatch on right — returns true if anything changed
         private static bool ColorFeatureRow(string label, ref bool toggle, ref uint color, string tip)
         {
-            bool changed   = false;
+            bool changed  = false;
             float swatchSz = 16f * UIScale;
-            float rowH     = 36f * UIScale;
-            float availW   = ImGui.GetContentRegionAvail().X;
-            var   curPos   = ImGui.GetCursorPos();
-            var   curScr   = ImGui.GetCursorScreenPos();
 
-            // Clip toggle draw area to leave space for swatch
-            ImGui.PushClipRect(
-                curScr,
-                new Vector2(curScr.X + availW - swatchSz - 10f * UIScale, curScr.Y + rowH),
-                true);
             bool t = toggle;
-            if (UIControls.ToggleRow(label, ref t, tip)) { toggle = t; changed = true; }
-            ImGui.PopClipRect();
+            if (ImGui.Checkbox("##t" + label, ref t)) { toggle = t; changed = true; }
+            ImGui.SameLine();
+            ImGui.TextUnformatted(label);
+            Tip(tip);
 
-            // Color swatch right-aligned on same row
-            ImGui.SetCursorPos(new Vector2(curPos.X + availW - swatchSz - 4f * UIScale,
-                                           curPos.Y + (rowH - swatchSz) * 0.5f));
+            ImGui.SameLine(ImGui.GetContentRegionMax().X - swatchSz);
             if (ColorSwatch("##c" + label, ref color, label + " color")) changed = true;
+
             return changed;
         }
 
-        // Row with just dim label + color swatch, returns true if color changed
+        // Dim label + color swatch only — returns true if color changed
         private static bool ColorOnlyRow(string label, ref uint color, string tip)
         {
             float swatchSz = 16f * UIScale;
-            float availW   = ImGui.GetContentRegionAvail().X;
-
             ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.55f, 0.60f, 0.65f, 1f));
             ImGui.TextUnformatted(label);
             ImGui.PopStyleColor();
-            if (ImGui.IsItemHovered()) ImGui.SetTooltip(tip);
+            Tip(tip);
 
-            ImGui.SameLine(availW - swatchSz - 4f * UIScale);
+            ImGui.SameLine(ImGui.GetContentRegionMax().X - swatchSz);
             return ColorSwatch("##co" + label, ref color, tip);
         }
 
-        // Returns true if color changed
+        // Small color button that opens a full color picker popup — returns true if changed
         private static bool ColorSwatch(string id, ref uint color, string tooltip)
         {
             float sz   = 16f * UIScale;
@@ -180,7 +165,7 @@ namespace eft_dma_radar.Silk.UI.Panels
                 new Vector2(sz, sz)))
                 ImGui.OpenPopup(id + "p");
 
-            if (ImGui.IsItemHovered()) ImGui.SetTooltip(tooltip);
+            Tip(tooltip);
 
             if (ImGui.BeginPopup(id + "p"))
             {
@@ -192,6 +177,22 @@ namespace eft_dma_radar.Silk.UI.Panels
                 ImGui.EndPopup();
             }
             return changed;
+        }
+
+        private static void SectionHeader(string label)
+        {
+            ImGui.Spacing();
+            ImGui.Separator();
+            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.55f, 0.58f, 0.62f, 1f));
+            ImGui.TextUnformatted(label);
+            ImGui.PopStyleColor();
+            ImGui.Separator();
+            ImGui.Spacing();
+        }
+
+        private static void Tip(string tip)
+        {
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip(tip);
         }
 
         private static Vector4 ToVec4(uint c) =>

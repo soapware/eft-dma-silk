@@ -147,7 +147,7 @@ namespace eft_dma_radar.Silk.UI.Panels
             ImGui.SameLine();
 
             // Refresh button — allowed in hideout or main menu, not in actual raids
-            bool canRefresh = !_refreshing && !Memory.InRaid && Config.HideoutEnabled;
+            bool canRefresh = !_refreshing && Memory.InHideout && Config.HideoutEnabled;
             if (!canRefresh)
                 ImGui.BeginDisabled();
 

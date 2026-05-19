@@ -804,8 +804,9 @@ namespace eft_dma_radar.Silk.UI
             const float padY = 5f;
             float lineH = font.Size + padY * 2f;
 
-            string hwMaxLabel = "HW MAX";
-            string hwMaxValue = $"{DMA.DmaStats.MaxThroughputMBps:F0} MB/s";
+            float  mbpsCur    = DMA.DmaStats.ReadMBpsCurrent;
+            string hwMaxLabel = "READ";
+            string hwMaxValue = $"{mbpsCur:F0} MB/s";
             string faultLabel = "FAULTS";
             string faultValue = $"{DMA.DmaStats.FaultCount}";
 
@@ -842,9 +843,26 @@ namespace eft_dma_radar.Silk.UI
                 canvas.DrawText(s, x, y, font, paint);
             }
 
+            // Gradient color for the live read value — red→yellow→green
+            float   ceiling = Math.Max(DMA.DmaStats.MaxThroughputMBps, DMA.DmaStats.ReadMBpsPeak);
+            SKColor speedColor;
+            if (ceiling <= 0f)
+            {
+                speedColor = SKPaints.TextRadarStatus.Color;
+            }
+            else
+            {
+                float ratio = Math.Clamp(mbpsCur / ceiling, 0f, 1f);
+                byte  r     = ratio <= 0.5f ? (byte)255 : (byte)(255 * (1f - (ratio - 0.5f) * 2f));
+                byte  g     = ratio <= 0.5f ? (byte)(255 * ratio * 2f) : (byte)255;
+                speedColor  = new SKColor(r, g, 13);
+            }
+
+            using var speedPaint = new SKPaint { Color = speedColor, IsAntialias = true };
+
             DrawCentered(hwMaxLabel, c1cx, labelY, SKPaints.TextRadarStatusSub);
             DrawCentered(faultLabel, c2cx, labelY, SKPaints.TextRadarStatusSub);
-            DrawCentered(hwMaxValue, c1cx, valueY, SKPaints.TextRadarStatus);
+            DrawCentered(hwMaxValue, c1cx, valueY, speedPaint);
             DrawCentered(faultValue, c2cx, valueY, SKPaints.TextRadarStatus);
         }
 

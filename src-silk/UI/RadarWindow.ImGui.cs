@@ -16,6 +16,7 @@ namespace eft_dma_radar.Silk.UI
         private static void DrawImGuiUI(ref Vector2D<int> fbSize, double delta)
         {
             _imgui.Update((float)delta);
+            ImGui.GetIO().FontGlobalScale = UIScale; // keep synced when user changes UIScale at runtime
 
             try
             {

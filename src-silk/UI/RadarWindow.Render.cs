@@ -652,7 +652,15 @@ namespace eft_dma_radar.Silk.UI
                 float dt = _waveLastMs == 0 ? 0f : (nowMs - _waveLastMs) / 1000f;
                 _waveLastMs = nowMs;
 
-                _wavePos += (_waveRight ? WaveSpeed : -WaveSpeed) * dt;
+                // Wave speed scales with DMA throughput: fast card = fast wave, slow card = slow wave
+                float wsBench  = DMA.DmaStats.MaxThroughputMBps;
+                float wsCur    = DMA.DmaStats.ReadMBpsCurrent;
+                float wsVal    = wsCur > 0f ? wsCur : wsBench;
+                float wsCeil   = Math.Max(wsBench, DMA.DmaStats.ReadMBpsPeak);
+                float wsRatio  = wsCeil > 0f ? Math.Clamp(wsVal / wsCeil, 0f, 1f) : 0.5f;
+                float dynSpeed = WaveSpeed * (0.3f + 0.7f * wsRatio);
+
+                _wavePos += (_waveRight ? dynSpeed : -dynSpeed) * dt;
                 if (_wavePos >= 1f) { _wavePos = 1f; _waveRight = false; }
                 if (_wavePos <= 0f) { _wavePos = 0f; _waveRight = true;  }
 
@@ -849,16 +857,16 @@ namespace eft_dma_radar.Silk.UI
                 canvas.DrawText(s, x, y, font, paint);
             }
 
-            // Gradient only for live scatter reads; benchmark fallback uses neutral color
+            // Gradient applied to both BENCH and READ — fastest relative to ceiling = green
             float   ceiling = Math.Max(mbpsBench, DMA.DmaStats.ReadMBpsPeak);
             SKColor speedColor;
-            if (!showingLive || ceiling <= 0f)
+            if (ceiling <= 0f)
             {
-                speedColor = SKPaints.TextRadarStatus.Color;
+                speedColor = SKPaints.TextRadarStatus.Color; // no reference yet — neutral
             }
             else
             {
-                float ratio = Math.Clamp(mbpsCur / ceiling, 0f, 1f);
+                float ratio = Math.Clamp(displayVal / ceiling, 0f, 1f);
                 byte  r     = ratio <= 0.5f ? (byte)255 : (byte)(255 * (1f - (ratio - 0.5f) * 2f));
                 byte  g     = ratio <= 0.5f ? (byte)(255 * ratio * 2f) : (byte)255;
                 speedColor  = new SKColor(r, g, 13);

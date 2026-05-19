@@ -203,8 +203,8 @@ namespace eft_dma_radar.Silk.UI.ESP
 
         #region Status Text
 
-        /// <summary>MS Gothic — matches radar status banner font family.</summary>
-        public static SKFont FontStatus { get; } = new(CustomFonts.MsGothic, 14) { Subpixel = true };
+        /// <summary>Cutive Mono — matches radar status banner font family.</summary>
+        public static SKFont FontStatus { get; } = new(CustomFonts.CutiveMono, 14) { Subpixel = true };
 
         public static SKPaint TextStatus { get; } = MakeFillPaint(255, 220, 60, 240);
 

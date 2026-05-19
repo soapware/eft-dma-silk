@@ -805,10 +805,10 @@ namespace eft_dma_radar.Silk.UI.ESP
         private static void DrawCenteredText(SKCanvas canvas, string text)
         {
             var size = _window!.Size;
-            float textWidth = SKPaints.FontRegular48.MeasureText(text);
+            float textWidth = SKPaints.FontBanner.MeasureText(text);
             float x = (size.X - textWidth) / 2f;
             float y = size.Y / 2f;
-            canvas.DrawText(text, x, y, SKPaints.FontRegular48, SKPaints.TextRadarStatus);
+            canvas.DrawText(text, x, y, SKPaints.FontBanner, SKPaints.TextRadarStatus);
         }
 
         private static void DrawFpsOverlay(SKCanvas canvas)

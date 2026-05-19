@@ -163,7 +163,23 @@ namespace eft_dma_radar.Silk.UI.ESP
         {
             try
             {
+                // When a saved position exists, find the monitor that actually contains it —
+                // EspTargetScreen may be stale and disagree with the saved coordinates.
                 var monitor = MonitorInfo.GetMonitor(Config.EspTargetScreen);
+                if (Config.EspWindowX >= 0 && Config.EspWindowY >= 0)
+                {
+                    var allMons = MonitorInfo.GetAllMonitors();
+                    for (int i = 0; i < allMons.Count; i++)
+                    {
+                        var m = allMons[i];
+                        if (Config.EspWindowX >= m.Left && Config.EspWindowX < m.Left + m.Width &&
+                            Config.EspWindowY >= m.Top  && Config.EspWindowY < m.Top  + m.Height)
+                        {
+                            monitor = m;
+                            break;
+                        }
+                    }
+                }
 
                 // Start windowed (draggable title bar) — not full-monitor.
                 // F11 fills the current monitor in borderless mode.

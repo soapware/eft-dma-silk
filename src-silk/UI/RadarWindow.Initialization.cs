@@ -32,7 +32,23 @@ namespace eft_dma_radar.Silk.UI
 
             // Position on the configured monitor. Do NOT set WindowState in options —
             // GLFW ignores Position when Maximized/Fullscreen is set in options.
+            // When a saved position exists, find the monitor that actually contains it —
+            // RadarTargetScreen may be stale and disagree with the saved coordinates.
             var radarMon = MonitorInfo.GetMonitor(Config.RadarTargetScreen);
+            if (Config.RadarWindowX >= 0 && Config.RadarWindowY >= 0)
+            {
+                var allMons = MonitorInfo.GetAllMonitors();
+                for (int i = 0; i < allMons.Count; i++)
+                {
+                    var m = allMons[i];
+                    if (Config.RadarWindowX >= m.Left && Config.RadarWindowX < m.Left + m.Width &&
+                        Config.RadarWindowY >= m.Top  && Config.RadarWindowY < m.Top  + m.Height)
+                    {
+                        radarMon = m;
+                        break;
+                    }
+                }
+            }
             // TitleBarOffset: GLFW positions by client-area top-left; ensure title bar stays on-screen.
             const int TitleBarOffset = 40;
             int winW = Math.Min(Config.WindowWidth,  radarMon.Width);

@@ -1,59 +1,50 @@
 # EFT (Silk.NET) — soapware fork
 
-A DMA radar overlay for **Escape from Tarkov** built on [Silk.NET](https://github.com/dotnet/Silk.NET), [ImGui.NET](https://github.com/ImGuiNET/ImGui.NET), and [SkiaSharp](https://github.com/mono/SkiaSharp). Ships with an embedded ASP.NET Core web radar.
+A modern DMA (Direct Memory Access) radar overlay for **Escape from Tarkov** (Unity 2022.3.43f1 EFT build), built on [Silk.NET](https://github.com/dotnet/Silk.NET) (Windowing / Input / OpenGL), [ImGui.NET](https://github.com/ImGuiNET/ImGui.NET) panels, and [SkiaSharp](https://github.com/mono/SkiaSharp) 2D rendering. Ships with an embedded ASP.NET Core web radar.
 
 > **Fork of [eft-dma-radar-silk](https://github.com/HuiTeab/eft-dma-radar-silk) by [HuiTeab](https://github.com/HuiTeab).** Original work © HuiTeab, PolyForm Noncommercial License 1.0.0.
 
-See **[SETUP.md](SETUP.md)** for the full build, configuration, and launch guide.
+> **Targeting the Unity 6 EFT build?** See the sibling repo [**eft-dma-radar-silk6**](https://github.com/HuiTeab/eft-dma-radar-silk6) — same UI, same web radar, same features; Unity 6000.3.6f1 engine offsets and IL2CPP layout.
 
 ---
 
-## What's in this fork
+## What's Different / New in this Repo
+### Mainly QOL additions
 
-### ESP Visuals Customization
+- **OBS-proof software cursor** — magenta triangle cursor drawn in the ImGui foreground layer; stays visible when OBS game capture hides the hardware cursor. Toggle in Settings → General → Display.
+- **ESP loot category colors** — each loot label is colored by item category (Meds, Keys, Ammo, Food, Weapons, etc.) with a distinct hue. Toggle in Loot Filters → Options → ESP Category Colors.
+- **ESP Visuals panel** — per-feature toggles (name label, health bar, weapon, distance, highlight), inline RGBA color pickers, box styles (Corners / Full / Top+Bottom bars), corner-fraction and line-thickness sliders, overlay opacity, name font selector, and health color thresholds.
+- **Key door blips** — scans held keys on raid entry and on inventory change; locked doors for which you hold the key are highlighted cyan on the radar map and labeled in the ESP overlay.
+- **Startup console** — phase-by-phase status panel replacing the raw debug console; DMA connection and speed shown with a red→yellow→green gradient; wave animation speed tied to DMA throughput.
+- **Persistent window state** — radar and ESP overlay windows remember their last position, monitor, size, and F11 fullscreen state across sessions.
+- **Magenta accent + UI polish** — `#ff00f5` accent throughout buttons, chips, and web radar; Cutive Mono font for status banners; DMA speed gradient chip in the status bar; full readable sidebar labels.
 
-A dedicated **ESP Visuals** panel (sidebar → Visuals) gives per-feature control over the overlay:
+---
 
-- **Feature toggles** — name label, health bar, weapon name, distance label, highlight target, each individually switchable
-- **Per-feature color pickers** — inline color swatches with a full RGBA picker for every element
-- **Box styles** — Corners, Full rectangle, or Top+Bottom bars, with a corner-fraction slider and line-thickness slider
-- **ESP window opacity** — a single slider (10–100%) dims the entire overlay window via the OS layered-window API
-- **Name font selector** — switch between Regular, Consolas, and Cutive Mono for player name labels
-- **Health color thresholds** — independently configure the high / mid / low health bar colors
+## Repo Layout
 
-### Key Door Blips
-
-Scans the local player's inventory on raid entry and again whenever items are picked up or dropped (event-driven, not a fixed timer). Locked doors for which the player holds the required key are highlighted **cyan** on the radar map and marked with a labeled world-space indicator in the ESP overlay. Toggle in **Settings → Map → Doors → Highlight Key Doors**.
-
-### Startup Console
-
-The debug console is replaced with a clean status panel showing each startup phase:
-
-- **DMA connection** — attempt lines shift green → yellow → orange → red as retries mount, with actionable hint text at each threshold
-- **DMA stats** — hardware benchmark speed shown immediately on connect, transitions to live read speed once scatter reads begin; both use the same red→yellow→green gradient
-- **Wave animation** — the status-screen wave speed is linked to DMA throughput so card performance is visible at a glance
-- **Error handling** — failure messages print once, then cycle a blinking dot in-place instead of flooding the console
-
-### Persistent Window State
-
-Both the radar and ESP overlay windows remember their last position, monitor, size, and F11 fullscreen state across sessions. Windows open exactly where they were left.
-
-### UI & Visual Polish
-
-- **Magenta accent** (`#ff00f5`) replaces the original teal throughout buttons, chips, and the web radar
-- **Cutive Mono font** for status banners and the DMA stats box
-- **Custom per-window icons** embedded in the exe and applied to the radar, ESP overlay, and startup screen
-- **DMA speed gradient** on the status bar chip — the MB/s readout colors red→yellow→green relative to the hardware ceiling
-- **Sidebar labels** use full readable names (Filter, History, Visuals, etc.)
+```
+eft-dma-radar-silk/
+├── eft-dma-radar-silk.sln       # Visual Studio solution (VmmSharpEx + src-silk)
+├── Directory.Build.props        # Common MSBuild props (net10.0-windows, x64, unsafe)
+├── version.json                 # Nerdbank.GitVersioning version source
+├── LICENSE                      # BSD Zero Clause License
+├── Maps/                        # EFT map SVGs + JSON metadata (Customs, Streets, …)
+├── Resources/                   # Embedded font + default item DB
+├── lib/
+│   └── VmmSharpEx/              # Managed MemProcFS / LeechCore wrapper + native DLLs
+└── src-silk/                    # The radar itself (entry: Program.cs → SilkProgram.Main)
+```
 
 ---
 
 ## Requirements
 
-- **ACTUAL DMA HARDWARE** supported by [MemProcFS](https://github.com/ufrisk/MemProcFS) (FPGA card, `usb3380`, etc.)
-- **Either Windows 10 / 11 (x64)** 
-- **[.NET 10 Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)**
-- Running applications as **Administrator** (requires elevation for DMA access)
+- **DMA hardware** supported by [MemProcFS](https://github.com/ufrisk/MemProcFS) (FPGA card, `usb3380`, etc.)
+- **Windows 10 / 11 (x64)** — project targets `net10.0-windows`, `PlatformTarget=x64`
+- **[.NET 10 SDK / Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)**
+- **Visual Studio 2022 17.12+** (or 2026 Insiders) with the **.NET desktop development** workload
+- The native MemProcFS binaries (`vmm.dll`, `leechcore.dll`, `FTD3XX.dll`, …) ship under `lib/VmmSharpEx/native/` and are copied to the build output automatically.
 
 ---
 
@@ -62,23 +53,80 @@ Both the radar and ESP overlay windows remember their last position, monitor, si
 ```powershell
 git clone https://github.com/soapware/eft-dma-silk.git
 cd eft-dma-silk
+
+# Build (Release, x64)
 dotnet build eft-dma-radar-silk.sln -c Release
+
+# Run
 dotnet run --project src-silk\eft-dma-radar.csproj -c Release
 ```
 
-Use `-debug` for verbose startup logging
+Pass `-debug` on the command line (or set `debugLogging=true` in the config) for verbose startup logging.
+
+In Visual Studio: open `eft-dma-radar-silk.sln`, set `eft-dma-radar` as the startup project, press **F5**.
+
+---
+
+## Highlights
+
+**Desktop shell**
+- **Icon sidebar** with two tiers — five primary panels (Players · Loot · Aimview · Quests · Settings) plus a compact secondary row (Loot Filters · Killfeed · Hideout · Quest Planner · Player History · Watchlist · Hotkeys) and ESP at the bottom. Every slot is a single click; hotkey hints come from the user's actual binding via `HotkeyManager.GetBindingDisplay`.
+- **Top command bar** — pill-style toggles in the same chip language as the bottom status bar: Follow/Free · Battle · Preset · Aim/Loot/Exfils · Restart · More. Right cluster shows current map + FPS.
+- **Big-chip status bar** at the bottom: raid state · players (segmented `T/P/S/AI` counts) · vitals · FPS · DMA · map — readable on AnyDesk / TV.
+- **Command palette** (`Ctrl+K`) fuzzy-searches every hotkey action and panel, **toast system** for transient feedback, **first-run tour**, and fully configurable hotkeys.
+
+**Presets** (Stealth · Loot Run · PvP · Quests · Custom) bundle 13 toggles each and are intentionally distinct — Stealth = silent extract, Loot Run = max info, PvP = hunter mode, Quests = objectives-only. Drift detection auto-demotes to Custom on manual tweaks.
+
+**Loot Filters panel** — full-width toggle rows, integer steppers (auto-repeat), combo rows, four **Quick View** chips (All Loot · Important+ · Wishlist · Quest), live `visible / total` counter.
+
+**Web radar** (`src-silk/Web/wwwroot/`) — primary buddy view. Works equally on a desktop browser (mouse + keyboard) and on a phone or tablet (touch).
+- **Bottom tab bar** (Players · Loot · Layers · Settings) opens slide-up **bottom sheets**; swipe-down or click the close button to dismiss.
+- **FAB radial** for the most-used toggles — click to open, click a slice to toggle; on touch, hold to open and release on a slice.
+- **Follow-me default** with **double-tap / double-click recenter** on empty map space, scroll-wheel or pinch zoom.
+- **Independent web presets** (Spotter · Battle Buddy · Loot Hunter · Quest Helper · Custom) — separate from the desktop host's preset; each buddy picks their own view. Top-center chip cycles them.
+
+**Map rendering**
+- SVG-based map layers with height-aware overlays and dimming.
+- **Satellite imagery** via assets.tarkov.dev tile pyramid (Customs, Interchange, Reserve, Shoreline, Woods, Ground Zero) — adaptive zoom level matching screen pixels per base-pixel, on-disk tile cache at `%LocalAppData%\eft-dma-radar-silk\tilecache`.
+- Independent toggles for desktop and web — the web radar has its own satellite switch that doesn't affect the host's view, and tiles are proxied through `/api/tile/{cacheKey}/{z}/{x}/{y}.png` to bypass CORS for browser clients.
+
+**Config**
+- `%AppData%\eft-dma-radar-silk\config.json` — debounced JSON persistence.
+- IL2CPP offsets resolved at startup and cached to `il2cpp_offsets.json`; hard-coded fallbacks live in `src-silk/SDK/Offsets.cs`.
+
+---
+
+## Project Details
+
+### `lib/VmmSharpEx`
+
+A managed C# wrapper around [MemProcFS](https://github.com/ufrisk/MemProcFS) (`vmm.dll`) and LeechCore (`leechcore.dll`). Provides a high-level `Vmm` handle (read / write / VFS / process enumeration), a `LeechCore` device wrapper, a scatter API for batched gathers / writes, a memory search engine, a refresh manager, strongly-typed flag enums, a Win32 virtual-key DMA input manager, and a `VmmPointer` abstraction with a rich `VmmException` hierarchy.
+
+- TFM: `net10.0-windows`, `Nullable=enable`, doc-file generated.
+- Native bin: `lib/VmmSharpEx/native/` (`vmm.dll`, `leechcore.dll`, `leechcore_driver.dll`, `FTD3XX.dll`, `dbghelp.dll`, `symsrv.dll`, `tinylz4.dll`, `vcruntime140.dll`).
+- License: **AGPL-3.0** — original MemProcFS API © Ulf Frisk; `VmmSharpEx` modifications © Lone (Lone DMA), 2025.
+
+### `src-silk`
+
+- AssemblyName: `eft-dma-radar` · RootNamespace: `eft_dma_radar.Silk`
+- Entry point: [`SilkProgram.Main`](src-silk/Program.cs)
+- Packages: `ImGui.NET 1.91.6.1`, `Silk.NET.Windowing/Input/OpenGL/OpenGL.Extensions.ImGui 2.23.0`, `SkiaSharp 3.119.2`, `Svg.Skia 3.0.3`, `Open.Nat.imerzan 2.2.0` (+ `Microsoft.AspNetCore.App` framework reference for the web radar).
 
 ---
 
 ## License
 
-`src-silk/` — **PolyForm Noncommercial License 1.0.0** (personal / non-commercial use only).  
-`lib/VmmSharpEx/` — **AGPL-3.0** (MemProcFS wrapper © Ulf Frisk; modifications © Lone DMA, 2025).
+The source code in this repository (everything outside `lib/VmmSharpEx/`) is licensed under the **[PolyForm Noncommercial License 1.0.0](LICENSE)** — free to use and modify for personal / non-commercial purposes; commercial use, resale, hosting paid services, or any other revenue-generating use is **not permitted**.
+
+The component under `lib/VmmSharpEx/` is a wrapper around [MemProcFS](https://github.com/ufrisk/MemProcFS) and is licensed separately under **AGPL-3.0** — its original copyright notices are retained in the source files of that directory. Because the compiled radar binary links AGPL-3.0 code, **redistributors of compiled binaries must also satisfy AGPL-3.0 requirements** (source availability, etc.). The PolyForm Noncommercial terms govern this repository's own source code.
+
+If you want to use this project commercially, that means writing a clean replacement for VmmSharpEx (talking to MemProcFS yourself) **and** obtaining a separate commercial license from the copyright holder of this repository.
 
 ---
 
 ## Credits
 
 - Original: **[HuiTeab](https://github.com/HuiTeab)** — [eft-dma-radar-silk](https://github.com/HuiTeab/eft-dma-radar-silk)
-- MemProcFS: **Ulf Frisk** — [github.com/ufrisk/MemProcFS](https://github.com/ufrisk/MemProcFS)
-- Reference data: [tarkov.dev](https://tarkov.dev/)
+- MemProcFS by **Ulf Frisk** (<https://github.com/ufrisk/MemProcFS>) — the DMA stack everything is built on.
+- Reference data from [tarkov.dev](https://tarkov.dev/) (see in-app credits).
+- Thanks to the broader EFT DMA / MemProcFS community for offsets and reverse-engineering work over the years.

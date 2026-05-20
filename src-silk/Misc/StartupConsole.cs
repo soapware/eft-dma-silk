@@ -285,7 +285,7 @@ namespace eft_dma_radar.Silk.Misc
                 Console.ForegroundColor = ConsoleColor.DarkCyan;
                 Console.Write(b);
                 Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.Write("]");
+                Console.Write(" ]");
             }
             Console.Write(" ");
 

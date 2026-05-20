@@ -163,34 +163,23 @@ namespace eft_dma_radar.Silk.UI.ESP
         {
             try
             {
-                // When a saved position exists, find the monitor that actually contains it —
-                // EspTargetScreen may be stale and disagree with the saved coordinates.
+                // EspTargetScreen is the authoritative source for which monitor this window belongs to.
+                // Saved X/Y are used for exact position restore only if they fall within that monitor's
+                // bounds — stale coords outside the monitor are ignored and the window is centred instead.
                 var monitor = MonitorInfo.GetMonitor(Config.EspTargetScreen);
-                if (Config.EspWindowX >= 0 && Config.EspWindowY >= 0)
+                int espW  = Math.Max(Config.EspWindowWidth,  320);
+                int espH  = Math.Max(Config.EspWindowHeight, 240);
+                int espCX = monitor.Left + (monitor.Width  - espW) / 2;
+                int espCY = monitor.Top  + (monitor.Height - espH) / 2;
+                int espX  = espCX, espY = espCY;
+                if (Config.EspWindowX >= monitor.Left &&
+                    Config.EspWindowX <  monitor.Left + monitor.Width &&
+                    Config.EspWindowY >= monitor.Top  &&
+                    Config.EspWindowY <  monitor.Top  + monitor.Height)
                 {
-                    var allMons = MonitorInfo.GetAllMonitors();
-                    for (int i = 0; i < allMons.Count; i++)
-                    {
-                        var m = allMons[i];
-                        if (Config.EspWindowX >= m.Left && Config.EspWindowX < m.Left + m.Width &&
-                            Config.EspWindowY >= m.Top  && Config.EspWindowY < m.Top  + m.Height)
-                        {
-                            monitor = m;
-                            break;
-                        }
-                    }
+                    espX = Config.EspWindowX;
+                    espY = Config.EspWindowY;
                 }
-
-                // Start windowed (draggable title bar) — not full-monitor.
-                // F11 fills the current monitor in borderless mode.
-                int espW = Math.Max(Config.EspWindowWidth,  320);
-                int espH = Math.Max(Config.EspWindowHeight, 240);
-                int espX = Config.EspWindowX >= 0
-                    ? Config.EspWindowX
-                    : monitor.Left + (monitor.Width  - espW) / 2;
-                int espY = Config.EspWindowY >= 0
-                    ? Config.EspWindowY
-                    : monitor.Top  + (monitor.Height - espH) / 2;
 
                 var options = WindowOptions.Default;
                 options.Size     = new Vector2D<int>(espW, espH);

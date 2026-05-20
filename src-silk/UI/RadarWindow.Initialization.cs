@@ -31,32 +31,24 @@ namespace eft_dma_radar.Silk.UI
             options.WindowBorder             = WindowBorder.Resizable; // explicit — ensures title bar
 
             // Position on the configured monitor. Do NOT set WindowState in options —
-            // GLFW ignores Position when Maximized/Fullscreen is set in options.
-            // When a saved position exists, find the monitor that actually contains it —
-            // RadarTargetScreen may be stale and disagree with the saved coordinates.
+            // RadarTargetScreen is the authoritative source for which monitor this window belongs to.
+            // Saved X/Y are used for exact position restore only if they fall within that monitor's
+            // bounds — stale coords outside the monitor are ignored and the window is centred instead.
             var radarMon = MonitorInfo.GetMonitor(Config.RadarTargetScreen);
-            if (Config.RadarWindowX >= 0 && Config.RadarWindowY >= 0)
-            {
-                var allMons = MonitorInfo.GetAllMonitors();
-                for (int i = 0; i < allMons.Count; i++)
-                {
-                    var m = allMons[i];
-                    if (Config.RadarWindowX >= m.Left && Config.RadarWindowX < m.Left + m.Width &&
-                        Config.RadarWindowY >= m.Top  && Config.RadarWindowY < m.Top  + m.Height)
-                    {
-                        radarMon = m;
-                        break;
-                    }
-                }
-            }
-            // TitleBarOffset: GLFW positions by client-area top-left; ensure title bar stays on-screen.
             const int TitleBarOffset = 40;
-            int winW = Math.Min(Config.WindowWidth,  radarMon.Width);
-            int winH = Math.Min(Config.WindowHeight, radarMon.Height - TitleBarOffset);
+            int winW  = Math.Min(Config.WindowWidth,  radarMon.Width);
+            int winH  = Math.Min(Config.WindowHeight, radarMon.Height - TitleBarOffset);
             int centX = radarMon.Left + (radarMon.Width  - winW) / 2;
             int centY = radarMon.Top  + Math.Max(TitleBarOffset, (radarMon.Height - winH) / 2);
-            int posX = Config.RadarWindowX >= 0 ? Config.RadarWindowX : centX;
-            int posY = Config.RadarWindowY >= 0 ? Config.RadarWindowY : centY;
+            int posX  = centX, posY = centY;
+            if (Config.RadarWindowX >= radarMon.Left &&
+                Config.RadarWindowX <  radarMon.Left + radarMon.Width &&
+                Config.RadarWindowY >= radarMon.Top  &&
+                Config.RadarWindowY <  radarMon.Top  + radarMon.Height)
+            {
+                posX = Config.RadarWindowX;
+                posY = Config.RadarWindowY;
+            }
             options.Position = new Vector2D<int>(posX, posY);
             options.Size     = new Vector2D<int>(winW, winH);
 

@@ -53,6 +53,14 @@ namespace eft_dma_radar.Silk.UI.Panels
                 Config.MarkDirty();
             }
 
+            bool softCursor = Config.ShowSoftCursor;
+            if (UIControls.ToggleRow("Software Cursor", ref softCursor,
+                "Draw a pink triangle cursor in the framebuffer — stays visible when OBS hides the hardware cursor"))
+            {
+                Config.ShowSoftCursor = softCursor;
+                Config.MarkDirty();
+            }
+
             UIControls.Section("Modes");
 
             bool battleMode = Config.BattleMode;

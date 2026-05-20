@@ -209,6 +209,10 @@ namespace eft_dma_radar.Silk.Config
         /// <summary>Target frames per second for the radar window.</summary>
         public int TargetFps { get; set; } = 60;
 
+        /// <summary>Draw a software cursor in the framebuffer (visible even when OBS hides the hardware cursor).</summary>
+        [JsonPropertyName("showSoftCursor")]
+        public bool ShowSoftCursor { get; set; } = true;
+
         /// <summary>Radar window width in pixels.</summary>
         public int WindowWidth { get; set; } = 1600;
 

@@ -268,10 +268,10 @@ namespace eft_dma_radar.Silk.UI
         };
 
         // ── Software cursor ──────────────────────────────────────────────────
-        /// <summary>Software cursor fill — white arrow body (OBS-proof cursor drawn in framebuffer).</summary>
+        /// <summary>Software cursor fill — pink triangle body (OBS-proof cursor drawn in framebuffer).</summary>
         public static SKPaint SoftCursorFill { get; } = new()
         {
-            Color = SKColors.White,
+            Color = new SKColor(255, 105, 180),
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
         };

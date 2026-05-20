@@ -41,6 +41,48 @@ namespace eft_dma_radar.Silk.UI.ESP
 
         #endregion
 
+        #region Ballistics
+
+        /// <summary>Predicted (simulated) shot trajectory — red.</summary>
+        public static SKPaint PredictedTrajectory { get; } = new()
+        {
+            Color = new SKColor(255, 90, 90, 220),
+            StrokeWidth = 2.0f,
+            Style = SKPaintStyle.Stroke,
+            IsAntialias = true,
+            StrokeJoin = SKStrokeJoin.Round,
+            StrokeCap = SKStrokeCap.Round,
+        };
+
+        /// <summary>In-flight game shot trail — green.</summary>
+        public static SKPaint LiveShotTrail { get; } = new()
+        {
+            Color = new SKColor(60, 230, 90, 220),
+            StrokeWidth = 2.0f,
+            Style = SKPaintStyle.Stroke,
+            IsAntialias = true,
+            StrokeJoin = SKStrokeJoin.Round,
+            StrokeCap = SKStrokeCap.Round,
+        };
+
+        /// <summary>Muzzle origin marker for predicted trajectory.</summary>
+        public static SKPaint MuzzleDot { get; } = new()
+        {
+            Color = new SKColor(255, 255, 255, 230),
+            Style = SKPaintStyle.Fill,
+            IsAntialias = true,
+        };
+
+        /// <summary>Endpoint marker for live shot trails — small filled circle.</summary>
+        public static SKPaint LiveShotHead { get; } = new()
+        {
+            Color = new SKColor(120, 255, 140, 240),
+            Style = SKPaintStyle.Fill,
+            IsAntialias = true,
+        };
+
+        #endregion
+
         #region Health Bar
 
         public static SKPaint HealthBarBg { get; } = new()

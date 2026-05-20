@@ -25,8 +25,25 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         private volatile IReadOnlyList<LootAirdrop> _airdrops = [];
         private long _lastRefreshTimestamp;
         private int _consecutiveScatterFailures;
-        private static readonly long RefreshIntervalTicks = (long)(Stopwatch.Frequency * 5); // 5 seconds
         private static readonly long FailureBackoffTicks = (long)(Stopwatch.Frequency * 1); // 1 second base backoff
+
+        /// <summary>
+        /// Per-item BSG ID Unity-string read cap (bytes). BSG IDs are 24 hex chars =
+        /// 48 UTF-16 bytes; 64 gives a 33% safety margin and halves bandwidth vs the
+        /// previous 128-byte cap on every uncached item per refresh.
+        /// </summary>
+        private const int BsgIdReadBytes = 64;
+
+        /// <summary>Per-item short-name read cap for quest items (UTF-16 bytes).</summary>
+        private const int QuestShortNameReadBytes = 96;
+
+        /// <summary>
+        /// Live refresh interval in stopwatch ticks. Read from
+        /// <see cref="SilkConfig.LootRefreshIntervalSeconds"/> each tick so the user can
+        /// raise it (e.g. 10s) for bandwidth-constrained setups without restarting the raid.
+        /// </summary>
+        private static long RefreshIntervalTicks =>
+            (long)(Stopwatch.Frequency * Math.Clamp(SilkProgram.Config?.LootRefreshIntervalSeconds ?? 10f, 2f, 60f));
 
         // Track corpses we've already read dogtags from (by interactiveClass address)
         private readonly HashSet<ulong> _processedCorpses = [];
@@ -44,6 +61,15 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         // Avoids re-running the expensive 6-round pointer-chain scatter for stable entries.
         private readonly Dictionary<ulong, PendingLoot> _lootPhase1Cache = new();
         private readonly Dictionary<ulong, PendingCorpse> _corpsePhase1Cache = new();
+
+        // Phase 2 result cache: lootBase → fully-resolved LootItem (incl. world position).
+        // Ground loot doesn't move once spawned — the dropped-item Transform chain is
+        // immutable for the item's lifetime in the LootList. Re-reading the BSG ID string
+        // and the parent-vertex array for every single item every refresh was the single
+        // biggest contributor to >200 MB/s DMA bandwidth, so we cache the resolved
+        // LootItem and only emit it on subsequent refreshes (zero Phase 2 reads).
+        // Pruned alongside _lootPhase1Cache when a lootBase leaves the LootList.
+        private readonly Dictionary<ulong, LootItem> _lootItemCache = new();
 
         // Static container cache: lootBase → fully resolved LootContainer + interactiveClass.
         // Containers don't move, so after the first successful resolve we only refresh the
@@ -132,62 +158,62 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                 return;
             }
 
-            // Extract items from container grids and add to loot list
-            try
-            {
-                Log.WriteLine($"[LootManager] Starting container grid extraction. Cache size: {_containerCache.Count}");
+            //// Extract items from container grids and add to loot list
+            //try
+            //{
+            //    Log.WriteLine($"[LootManager] Starting container grid extraction. Cache size: {_containerCache.Count}");
 
-                if (_containerCache.Count > 0)
-                {
-                    var containerInfo = _containerCache
-                        .Where(x => x.Value.MainStoragePtr.IsValidVirtualAddress())
-                        .Select(x => (x.Value.MainStoragePtr, x.Value.Position, x.Key))
-                        .ToList();
+            //    if (_containerCache.Count > 0)
+            //    {
+            //        var containerInfo = _containerCache
+            //            .Where(x => x.Value.MainStoragePtr.IsValidVirtualAddress())
+            //            .Select(x => (x.Value.MainStoragePtr, x.Value.Position, x.Key))
+            //            .ToList();
 
-                    Log.WriteLine($"[LootManager] Containers with valid MainStorage: {containerInfo.Count}");
+            //        Log.WriteLine($"[LootManager] Containers with valid MainStorage: {containerInfo.Count}");
 
-                    if (containerInfo.Count > 0)
-                    {
-                        Log.WriteLine($"[LootManager] Extracting pending container items from {containerInfo.Count} containers...");
-                        var pendingContainerItems = ExtractContainerGridItemsPending(containerInfo);
-                        Log.WriteLine($"[LootManager] Extracted {pendingContainerItems.Count} pending container items");
+            //        if (containerInfo.Count > 0)
+            //        {
+            //            Log.WriteLine($"[LootManager] Extracting pending container items from {containerInfo.Count} containers...");
+            //            var pendingContainerItems = ExtractContainerGridItemsPending(containerInfo);
+            //            Log.WriteLine($"[LootManager] Extracted {pendingContainerItems.Count} pending container items");
 
-                        if (pendingContainerItems.Count > 0)
-                        {
-                            Log.WriteLine($"[LootManager] Resolving {pendingContainerItems.Count} container items to LootItems...");
-                            var containerItems = ResolveContainerItemsBatched(pendingContainerItems);
-                            Log.WriteLine($"[LootManager] Resolved {containerItems.Count} container items");
+            //            if (pendingContainerItems.Count > 0)
+            //            {
+            //                Log.WriteLine($"[LootManager] Resolving {pendingContainerItems.Count} container items to LootItems...");
+            //                var containerItems = ResolveContainerItemsBatched(pendingContainerItems);
+            //                Log.WriteLine($"[LootManager] Resolved {containerItems.Count} container items");
 
-                            if (containerItems.Count > 0)
-                            {
-                                // Merge container items with loot items
-                                var merged = new List<LootItem>(lootResult.Count + containerItems.Count);
-                                merged.AddRange(lootResult);
-                                merged.AddRange(containerItems);
-                                _loot = merged;
-                                Log.WriteLine($"[LootManager] Merged container items. Total loot: {_loot.Count}");
-                            }
-                        }
-                        else
-                        {
-                            Log.WriteLine($"[LootManager] No pending container items extracted");
-                        }
-                    }
-                    else
-                    {
-                        Log.WriteLine($"[LootManager] No containers with valid MainStorage pointers");
-                    }
-                }
-                else
-                {
-                    Log.WriteLine($"[LootManager] Container cache is empty");
-                }
-            }
-            catch (Exception ex)
-            {
-                Log.WriteRateLimited(AppLogLevel.Warning, "container_items_fail", TimeSpan.FromSeconds(5),
-                    $"[LootManager] Container items extraction failed: {ex.Message}");
-            }
+            //                if (containerItems.Count > 0)
+            //                {
+            //                    // Merge container items with loot items
+            //                    var merged = new List<LootItem>(lootResult.Count + containerItems.Count);
+            //                    merged.AddRange(lootResult);
+            //                    merged.AddRange(containerItems);
+            //                    _loot = merged;
+            //                    Log.WriteLine($"[LootManager] Merged container items. Total loot: {_loot.Count}");
+            //                }
+            //            }
+            //            else
+            //            {
+            //                Log.WriteLine($"[LootManager] No pending container items extracted");
+            //            }
+            //        }
+            //        else
+            //        {
+            //            Log.WriteLine($"[LootManager] No containers with valid MainStorage pointers");
+            //        }
+            //    }
+            //    else
+            //    {
+            //        Log.WriteLine($"[LootManager] Container cache is empty");
+            //    }
+            //}
+            //catch (Exception ex)
+            //{
+            //    Log.WriteRateLimited(AppLogLevel.Warning, "container_items_fail", TimeSpan.FromSeconds(5),
+            //        $"[LootManager] Container items extraction failed: {ex.Message}");
+            //}
 
             // Carry over previously-read gear/name data to new corpse objects
             var oldCorpses = _corpses;
@@ -266,7 +292,23 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                         (stale ??= new()).Add(k);
                 if (stale is not null)
                     foreach (var k in stale)
+                    {
                         _lootPhase1Cache.Remove(k);
+                        _lootItemCache.Remove(k);
+                    }
+            }
+
+            // Defensive: drop any _lootItemCache entry whose lootBase is no longer present
+            // even if it lacked a Phase 1 entry (shouldn't happen, but cheap to verify).
+            if (_lootItemCache.Count > 0)
+            {
+                List<ulong>? stale = null;
+                foreach (var k in _lootItemCache.Keys)
+                    if (!currentPtrs.Contains(k))
+                        (stale ??= new()).Add(k);
+                if (stale is not null)
+                    foreach (var k in stale)
+                        _lootItemCache.Remove(k);
             }
 
             if (_corpsePhase1Cache.Count > 0)
@@ -520,7 +562,40 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
             // Each category is resolved independently; a transient scatter failure in one
             // category must NOT blank the others. Exceptions from any single Resolve* call
             // are swallowed so partial snapshots can still be returned to the caller.
-            try { lootResult = ResolveLootBatched(pendingLoot); }
+            try
+            {
+                // Split pending into (a) entries already resolved in a prior refresh
+                // and (b) brand-new entries that still need the full Phase 2 scatter.
+                // Cached entries skip all 3 batches entirely — by far the biggest
+                // bandwidth saving for a steady-state raid (95%+ of loot is static).
+                List<PendingLoot>? newPending = null;
+                int cachedHits = 0;
+                lootResult = new List<LootItem>(pendingLoot.Count);
+                foreach (var p in pendingLoot)
+                {
+                    if (p.LootBase != 0 && _lootItemCache.TryGetValue(p.LootBase, out var cached))
+                    {
+                        lootResult.Add(cached);
+                        cachedHits++;
+                    }
+                    else
+                    {
+                        (newPending ??= new List<PendingLoot>()).Add(p);
+                    }
+                }
+                if (newPending is not null && newPending.Count > 0)
+                {
+                    var resolved = ResolveLootBatched(newPending);
+                    foreach (var item in resolved)
+                    {
+                        lootResult.Add(item);
+                        if (item.LootBase != 0)
+                            _lootItemCache[item.LootBase] = item;
+                    }
+                }
+                Log.WriteRateLimited(AppLogLevel.Debug, "loot_cache_stats", TimeSpan.FromSeconds(30),
+                    $"[LootManager] LootItem cache: {cachedHits} hits, {newPending?.Count ?? 0} new, {_lootItemCache.Count} cached total");
+            }
             catch (Exception ex)
             {
                 Log.WriteRateLimited(AppLogLevel.Warning, "loot_resolve_phase_fail", TimeSpan.FromSeconds(5),
@@ -870,13 +945,15 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                         continue;
                     s1.PrepareReadValue<ulong>(ti + UnityOffsets.TransformAccess.HierarchyOffset);
                     s1.PrepareReadValue<int>(ti + UnityOffsets.TransformAccess.IndexOffset);
-                    // Unity string: length at +0x10 (int), chars at +0x14 (UTF-16)
-                    s1.PrepareRead(pending[i].BsgIdStringAddr + 0x14, 128);
+                    // Unity string: length at +0x10 (int), chars at +0x14 (UTF-16).
+                    // BSG IDs are 24 hex chars (48 UTF-16 bytes); cap generously at 64 to
+                    // halve the per-item string bandwidth without truncating any real ID.
+                    s1.PrepareRead(pending[i].BsgIdStringAddr + 0x14, BsgIdReadBytes);
 
                     // Quest items rarely exist in the market database — read ShortName
                     // so we can synthesize a display name for them.
                     if (pending[i].IsQuestItem && pending[i].ShortNameUnityString.IsValidVirtualAddress())
-                        s1.PrepareRead(pending[i].ShortNameUnityString + 0x14, 128);
+                        s1.PrepareRead(pending[i].ShortNameUnityString + 0x14, QuestShortNameReadBytes);
                 }
                 s1.Execute();
 
@@ -885,9 +962,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                     var ti = pending[i].TransformInternal;
                     s1.ReadValue<ulong>(ti + UnityOffsets.TransformAccess.HierarchyOffset, out hierarchies[i]);
                     s1.ReadValue<int>(ti + UnityOffsets.TransformAccess.IndexOffset, out indices[i]);
-                    bsgIds[i] = s1.ReadString(pending[i].BsgIdStringAddr + 0x14, 128, Encoding.Unicode);
+                    bsgIds[i] = s1.ReadString(pending[i].BsgIdStringAddr + 0x14, BsgIdReadBytes, Encoding.Unicode);
                     if (pending[i].IsQuestItem && pending[i].ShortNameUnityString.IsValidVirtualAddress())
-                        shortNames[i] = s1.ReadString(pending[i].ShortNameUnityString + 0x14, 128, Encoding.Unicode);
+                        shortNames[i] = s1.ReadString(pending[i].ShortNameUnityString + 0x14, QuestShortNameReadBytes, Encoding.Unicode);
                 }
             }
 
@@ -984,7 +1061,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                             if (pos == Vector3.Zero)
                                 continue;
 
-                            var item = new LootItem(marketItem, pos) { IsQuestItem = isQuestItem };
+                            var item = new LootItem(marketItem, pos)
+                            {
+                                IsQuestItem = isQuestItem,
+                                LootBase = pending[i].LootBase,
+                            };
                             item.RefreshImportance();
                             result.Add(item);
                         }

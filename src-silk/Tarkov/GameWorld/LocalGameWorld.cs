@@ -567,8 +567,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
                 // Fast BTR position update — same ~8ms cadence as player transforms so
                 // the BTR marker/ESP never lags behind. Pointer resolution still happens
-                // on the slower explosives worker.
-                _btrTracker?.UpdatePosition();
+                // on the slower explosives worker. Skipped when BTR display is off.
+                if (SilkProgram.Config.ShowBTR)
+                    _btrTracker?.UpdatePosition();
 
                 // Identify the BTR turret gunner by pointer — authoritative match against
                 // BTRTurretView._bot. Cheap: single dictionary-style scan over _players.
@@ -800,17 +801,31 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         /// </summary>
         private void DoSecondaryWork()
         {
-            // Exfil status refresh
+            // Exfil status refresh (always — exfil markers are core radar info,
+            // refresh is internally rate-limited to ~3s so bandwidth is negligible)
             _exfilManager?.Refresh();
 
-            // Quest data refresh (rate-limited internally to once per 2s)
-            _questManager?.Refresh();
+            // Quest data refresh — only when any quest UI is consuming it:
+            //   ShowQuests              → quest zone markers on radar
+            //   ShowQuestPanel          → quest details panel
+            //   ShowQuestPlannerPanel   → planner overlay
+            //   QuestHighlightLootItems → loot filter quest-item highlighting
+            if (SilkProgram.Config.ShowQuests
+                || SilkProgram.Config.ShowQuestPanel
+                || SilkProgram.Config.ShowQuestPlannerPanel
+                || SilkProgram.Config.QuestHighlightLootItems)
+            {
+                _questManager?.Refresh();
+            }
 
-            // In-game wishlist refresh (rate-limited internally to once per 3s)
+            // In-game wishlist refresh — always (always consumed by loot filter for
+            // wishlist highlighting). Internally rate-limited to ~3s so cost is small.
             _wishlistManager?.Refresh();
 
-            // Interactables (doors) — discovery + state refresh (rate-limited internally)
-            _interactablesManager.Refresh();
+            // Interactables (doors) — only consumed when ShowDoors is on.
+            // Refresh handles its own discovery + 750ms state polling internally.
+            if (SilkProgram.Config.ShowDoors)
+                _interactablesManager.Refresh();
 
             // Update door-loot proximity flags — rate-limited to once per second.
             // Doors change rarely; running this every 100ms tick wastes CPU on an O(doors×loot) scan.
@@ -872,11 +887,17 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
             try
             {
-                // Explosives: grenades, tripwires, mortar projectiles
-                _explosivesManager?.Refresh();
+                // Explosives: grenades, tripwires, mortar projectiles.
+                // Only consumed by RadarWindow.Render when Config.ShowExplosives is on —
+                // skip the DMA refresh entirely when the user has hidden the layer.
+                if (SilkProgram.Config.ShowExplosives)
+                    _explosivesManager?.Refresh();
 
-                // BTR vehicle tracking
-                _btrTracker?.Refresh();
+                // BTR vehicle tracking.
+                // Consumed by radar BTR marker (Config.ShowBTR) and ESP passenger-snap
+                // (best-effort cosmetic — falls back to non-snapped positions when off).
+                if (SilkProgram.Config.ShowBTR)
+                    _btrTracker?.Refresh();
             }
             catch (RaidEnded)
             {

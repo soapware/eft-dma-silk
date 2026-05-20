@@ -76,6 +76,24 @@ namespace eft_dma_radar.Silk.Config
         [JsonPropertyName("playersOnTop")] public bool PlayersOnTop { get; set; }
     }
 
+    /// <summary>
+    /// User override for a single map's calibration (the X / Y / Scale fields of
+    /// <see cref="UI.Maps.MapConfig"/>). Persisted per-map-id so the user can fine-tune
+    /// alignment once and have it stick across app restarts, and so the web radar
+    /// serves the corrected projection.
+    /// </summary>
+    public sealed class MapCalibration
+    {
+        [JsonPropertyName("x")]
+        public float X { get; set; }
+
+        [JsonPropertyName("y")]
+        public float Y { get; set; }
+
+        [JsonPropertyName("scale")]
+        public float Scale { get; set; } = 1f;
+    }
+
     /// <summary>Per-feature memory write settings.</summary>
     public sealed class MemWritesConfig
     {
@@ -84,6 +102,53 @@ namespace eft_dma_radar.Silk.Config
 
         [JsonPropertyName("thermalVision")]
         public bool ThermalVision { get; set; } = false;
+    }
+
+    /// <summary>
+    /// Ballistics simulation + debug overlay settings.
+    /// Read by <c>BallisticsFeature</c>, <c>BallisticsRenderer</c>, and the debug HUD.
+    /// </summary>
+    public sealed class BallisticsConfig
+    {
+        /// <summary>Master toggle. When false the worker still runs but does no work.</summary>
+        [JsonPropertyName("enabled")]
+        public bool Enabled { get; set; } = false;
+
+        /// <summary>Draw the predicted shot arc (red) overlaid on the ESP world.</summary>
+        [JsonPropertyName("drawPredictedTrajectory")]
+        public bool DrawPredictedTrajectory { get; set; } = true;
+
+        /// <summary>Draw live in-flight bullet trails (green) read from the game's Shots list.</summary>
+        [JsonPropertyName("drawLiveShots")]
+        public bool DrawLiveShots { get; set; } = true;
+
+        /// <summary>Show the ammo / muzzle-velocity / drop HUD widget in the radar window.</summary>
+        [JsonPropertyName("showDebugHud")]
+        public bool ShowDebugHud { get; set; } = true;
+
+        /// <summary>When true, replace the hardcoded G1 table with the game's own as soon as a shot is observed.</summary>
+        [JsonPropertyName("useGameG1Table")]
+        public bool UseGameG1Table { get; set; } = true;
+
+        /// <summary>Hard cap on simultaneously-tracked in-flight bullets.</summary>
+        [JsonPropertyName("maxLiveShots")]
+        public int MaxLiveShots { get; set; } = 256;
+
+        /// <summary>Live shot trail fade-out / GC time (seconds).</summary>
+        [JsonPropertyName("liveShotLifetime")]
+        public float LiveShotLifetime { get; set; } = 4.5f;
+
+        /// <summary>Skia stroke width for trajectory + live shot lines.</summary>
+        [JsonPropertyName("lineWidth")]
+        public float LineWidth { get; set; } = 2.0f;
+
+        /// <summary>Sample count for predicted trajectory polyline (8..512).</summary>
+        [JsonPropertyName("predictedSamples")]
+        public int PredictedSamples { get; set; } = 128;
+
+        /// <summary>Max predicted-trajectory distance from muzzle (meters).</summary>
+        [JsonPropertyName("predictedMaxDistance")]
+        public float PredictedMaxDistance { get; set; } = 400f;
     }
 
     /// <summary>
@@ -602,6 +667,35 @@ namespace eft_dma_radar.Silk.Config
         [JsonPropertyName("useSatelliteMap")]
         public bool UseSatelliteMap { get; set; } = false;
 
+        /// <summary>
+        /// When true, fetch the map's SVG from <c>assets.tarkov.dev</c> instead of using
+        /// the bundled local SVG files. Downloads are cached persistently under
+        /// <c>%AppData%\eft-dma-radar-silk\tarkov-dev-maps\</c> — one network round-trip
+        /// per map per install, then offline-friendly. Mutually exclusive with
+        /// <see cref="UseSatelliteMap"/> (satellite wins if both are on).
+        /// </summary>
+        [JsonPropertyName("useTarkovDevMap")]
+        public bool UseTarkovDevMap { get; set; } = false;
+
+        /// <summary>
+        /// Visual rotation (in degrees: 0, 90, 180, 270) applied to tarkov.dev SVG
+        /// maps when they are active. tarkov.dev SVGs are authored in a raw coord
+        /// space that doesn't line up with silk's bundled SVG orientation; this
+        /// setting lets the user pick the orientation they prefer.
+        /// </summary>
+        [JsonPropertyName("tarkovDevMapRotation")]
+        public int TarkovDevMapRotation { get; set; } = 90;
+
+        /// <summary>
+        /// Per-map calibration overrides keyed by primary map ID (e.g. "bigmap",
+        /// "interchange"). When present, <see cref="UI.Maps.MapManager"/> applies the
+        /// stored X / Y / Scale to the loaded <see cref="UI.Maps.MapConfig"/>,
+        /// overriding the bundled defaults. The user saves an override by clicking
+        /// "Save Calibration" in the Map Setup panel; reset removes the entry.
+        /// </summary>
+        [JsonPropertyName("mapCalibrationOverrides")]
+        public Dictionary<string, MapCalibration> MapCalibrationOverrides { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
         // ── Loot ────────────────────────────────────────────────────────────────
 
         /// <summary>Master toggle for loot rendering on the radar.</summary>
@@ -738,6 +832,18 @@ namespace eft_dma_radar.Silk.Config
         /// <summary>Per-feature memory write settings.</summary>
         public MemWritesConfig MemWrites { get; set; } = new();
 
+        /// <summary>Ballistics simulation + debug overlay settings.</summary>
+        public BallisticsConfig Ballistics { get; set; } = new();
+
+        /// <summary>
+        /// Seconds between full loot list refreshes. Default 10s — ground loot is static
+        /// once spawned and the LootManager caches the resolved <c>LootItem</c> for the
+        /// entire raid, so the only DMA cost per refresh is verifying which entries are
+        /// still present. Lower to 5s if you want faster pickup of dropped items at the
+        /// cost of ~2× the (already cached-heavy) loot bandwidth. Clamped to [2, 60].
+        /// </summary>
+        public float LootRefreshIntervalSeconds { get; set; } = 10f;
+
         // ── Web Radar ───────────────────────────────────────────────────────────
 
         /// <summary>Enable the web radar HTTP server on startup.</summary>
@@ -843,10 +949,21 @@ namespace eft_dma_radar.Silk.Config
             Hotkeys ??= [];
             SelectedContainers ??= [];
             QuestBlacklist ??= [];
+            MapCalibrationOverrides ??= new(StringComparer.OrdinalIgnoreCase);
 
             RightDockWidth = Math.Clamp(RightDockWidth, 260f, 720f);
 
             MemWrites ??= new();
+
+            // Snap TarkovDevMapRotation to the nearest supported quadrant.
+            TarkovDevMapRotation = ((TarkovDevMapRotation % 360) + 360) % 360;
+            TarkovDevMapRotation = TarkovDevMapRotation switch
+            {
+                >= 45 and < 135  => 90,
+                >= 135 and < 225 => 180,
+                >= 225 and < 315 => 270,
+                _ => 0,
+            };
 
             // Seed built-in preset baselines on first load (or after a fresh install).
             eft_dma_radar.Silk.UI.Presets.PresetManager.EnsureSeeded(this);

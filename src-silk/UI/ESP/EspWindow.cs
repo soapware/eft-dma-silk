@@ -604,6 +604,14 @@ namespace eft_dma_radar.Silk.UI.ESP
                     }
                 }
             }
+
+            // Ballistics overlay — predicted trajectory + live shot trails.
+            try { BallisticsRenderer.Draw(canvas); }
+            catch (Exception ex)
+            {
+                Log.WriteRateLimited(AppLogLevel.Warning, "esp_ballistics_draw", TimeSpan.FromSeconds(5),
+                    $"[EspWindow] BallisticsRenderer.Draw failed: {ex.Message}");
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -32,6 +32,13 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         public string ShortName => _item.ShortName;
         public Vector3 Position { get; set; } = position;
 
+        /// <summary>
+        /// Source pointer (the <c>EFT.Interactive.ObservedLootItem</c> Mono behaviour's
+        /// IL2CPP base address) used as a cache key by <see cref="LootManager"/>.
+        /// Zero for synthetic items (e.g. container-grid expansion).
+        /// </summary>
+        public ulong LootBase { get; init; }
+
         /// <summary>The underlying market item data.</summary>
         public TarkovMarketItem MarketItem => _item;
 

@@ -267,25 +267,6 @@ namespace eft_dma_radar.Silk.UI
             IsAntialias = true,
         };
 
-        // ── Software cursor ──────────────────────────────────────────────────
-        /// <summary>Software cursor fill — pink triangle body (OBS-proof cursor drawn in framebuffer).</summary>
-        public static SKPaint SoftCursorFill { get; } = new()
-        {
-            Color = new SKColor(255, 105, 180),
-            Style = SKPaintStyle.Fill,
-            IsAntialias = true,
-        };
-
-        /// <summary>Software cursor outline — black stroke for contrast on any background.</summary>
-        public static SKPaint SoftCursorOutline { get; } = new()
-        {
-            Color = SKColors.Black,
-            Style = SKPaintStyle.Stroke,
-            StrokeWidth = 1.5f,
-            StrokeJoin = SKStrokeJoin.Round,
-            IsAntialias = true,
-        };
-
         /// <summary>Corpse marker fill — muted orange.</summary>
         public static SKPaint PaintCorpse { get; } = NewFillPaint(new SKColor(200, 150, 80, 180));
 

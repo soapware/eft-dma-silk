@@ -25,6 +25,11 @@ namespace eft_dma_radar.Silk.UI
                 DrawStatusBar();
                 Sidebar.Draw();
                 DrawWindows();
+
+                // Software cursor — drawn via ImGui foreground list so it sits on top
+                // of all ImGui windows. Uses io.MousePos (always current, no click needed).
+                if (Config.ShowSoftCursor)
+                    DrawImGuiCursor();
             }
             finally
             {
@@ -256,6 +261,23 @@ namespace eft_dma_radar.Silk.UI
             float rightTextWidth = ImGui.CalcTextSize(_cachedMenuBarRightText).X;
             ImGui.SetCursorPosX(ImGui.GetWindowWidth() - rightTextWidth - 14f);
             ImGui.TextColored(ColorMenuBarRight, _cachedMenuBarRightText);
+        }
+
+        private static void DrawImGuiCursor()
+        {
+            var pos = ImGui.GetIO().MousePos;
+            if (pos.X < 0 || pos.Y < 0) return;
+
+            var dl      = ImGui.GetForegroundDrawList();
+            uint fill   = ImGui.ColorConvertFloat4ToU32(new Vector4(1.00f, 0.51f, 0.51f, 0.94f)); // salmon pink (255,130,130)
+            uint outline = ImGui.ColorConvertFloat4ToU32(new Vector4(0.00f, 0.00f, 0.00f, 0.80f));
+
+            var tip   = pos;
+            var bot   = new Vector2(pos.X,       pos.Y + 16f);
+            var right = new Vector2(pos.X + 11f, pos.Y + 6f);
+
+            dl.AddTriangleFilled(tip, bot, right, fill);
+            dl.AddTriangle(tip, bot, right, outline, 1.5f);
         }
 
         private static void DrawMainMenuBar()

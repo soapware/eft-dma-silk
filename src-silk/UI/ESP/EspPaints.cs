@@ -180,6 +180,20 @@ namespace eft_dma_radar.Silk.UI.ESP
 
         #endregion
 
+        #region Category Colors
+
+        public static SKPaint TextCatMeds      { get; } = MakeFillPaint(255, 130, 130, 240); // salmon
+        public static SKPaint TextCatFood      { get; } = MakeFillPaint(180, 225,  80, 240); // lime
+        public static SKPaint TextCatKey       { get; } = MakeFillPaint(190, 130, 255, 240); // lavender
+        public static SKPaint TextCatAmmo      { get; } = MakeFillPaint(255, 160,  60, 240); // orange
+        public static SKPaint TextCatWeapon    { get; } = MakeFillPaint(255,  90,  60, 240); // red-orange
+        public static SKPaint TextCatWeaponMod { get; } = MakeFillPaint(255, 190, 120, 240); // peach
+        public static SKPaint TextCatBackpack  { get; } = MakeFillPaint(100, 185, 255, 240); // sky blue
+        public static SKPaint TextCatCurrency  { get; } = MakeFillPaint(255, 215,  50, 240); // gold
+        public static SKPaint TextCatBarter    { get; } = MakeFillPaint(205, 180, 135, 240); // tan
+
+        #endregion
+
         #region Key Door
 
         /// <summary>Bright cyan — matches <see cref="SKPaints.PaintKeyDoor"/> on the radar.</summary>

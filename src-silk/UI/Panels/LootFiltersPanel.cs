@@ -717,6 +717,15 @@ namespace eft_dma_radar.Silk.UI.Panels
                 Config.MarkDirty();
             }
 
+            // ESP category colors \u2014 color loot labels by item type.
+            bool catColors = Config.EspLootCategoryColors;
+            if (UIControls.ToggleRow("ESP Category Colors", ref catColors,
+                "Color ESP loot labels by category \u2014 Meds, Keys, Ammo, Food, Weapons, etc. each get a distinct hue."))
+            {
+                Config.EspLootCategoryColors = catColors;
+                Config.MarkDirty();
+            }
+
             // Show corpses \u2014 toggle row.
             bool showCorpses = Config.ShowCorpses;
             if (UIControls.ToggleRow("Show Corpses", ref showCorpses,

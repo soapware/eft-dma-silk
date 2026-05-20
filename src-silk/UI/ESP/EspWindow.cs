@@ -931,8 +931,8 @@ namespace eft_dma_radar.Silk.UI.ESP
 
             var textPaint = result.QuestRequired ? EspPaints.TextLootQuest
                 : result.Wishlisted ? EspPaints.TextLootWishlist
-                : result.Important ? EspPaints.TextLootImportant
-                : EspPaints.TextLoot;
+                : result.Important  ? EspPaints.TextLootImportant
+                : (Config.EspLootCategoryColors ? GetCategoryPaint(item.MarketItem) : EspPaints.TextLoot);
 
             string label = price > 0
                 ? $"{item.ShortName} ({LootFilter.FormatPrice(price)}) [{(int)distance}m]"
@@ -949,6 +949,20 @@ namespace eft_dma_radar.Silk.UI.ESP
         #endregion
 
         #region Helpers
+
+        private static SKPaint GetCategoryPaint(TarkovMarketItem m) => m switch
+        {
+            _ when m.IsMeds      => EspPaints.TextCatMeds,
+            _ when m.IsFood      => EspPaints.TextCatFood,
+            _ when m.IsKey       => EspPaints.TextCatKey,
+            _ when m.IsAmmo      => EspPaints.TextCatAmmo,
+            _ when m.IsWeapon    => EspPaints.TextCatWeapon,
+            _ when m.IsWeaponMod => EspPaints.TextCatWeaponMod,
+            _ when m.IsBackpack  => EspPaints.TextCatBackpack,
+            _ when m.IsCurrency  => EspPaints.TextCatCurrency,
+            _ when m.IsBarter    => EspPaints.TextCatBarter,
+            _                    => EspPaints.TextLoot,
+        };
 
         private static void DrawCenteredText(SKCanvas canvas, string text)
         {

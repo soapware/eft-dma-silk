@@ -406,6 +406,10 @@ namespace eft_dma_radar.Silk.Config
 
         /// <summary>Show loot labels on the ESP overlay.</summary>
         public bool EspShowLoot { get; set; } = true;
+
+        /// <summary>Color ESP loot labels by item category (Meds, Ammo, Keys, etc.).</summary>
+        [JsonPropertyName("espLootCategoryColors")]
+        public bool EspLootCategoryColors { get; set; } = false;
         public bool EspShowBones { get; set; } = true;
 
         /// <summary>

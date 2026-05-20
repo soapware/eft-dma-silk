@@ -44,9 +44,6 @@ namespace eft_dma_radar.Silk.UI
         private static int _fps;
         private static readonly PeriodicTimer _fpsTimer = new(TimeSpan.FromSeconds(1));
 
-        // Reusable path for software cursor — reset each frame, zero per-frame allocation.
-        private static readonly SKPath _cursorPath = new();
-
         // Mouse state
         private static bool _mouseDown;
         private static Vector2 _lastMousePosition;

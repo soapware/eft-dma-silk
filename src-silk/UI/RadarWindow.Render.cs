@@ -72,24 +72,44 @@ namespace eft_dma_radar.Silk.UI
                 var scale = UIScale;
                 canvas.Scale(scale, scale);
 
-                if (InRaid && LocalPlayer is Player localPlayer)
+                if (InRaid)
                 {
-                    var mapID = MapID;
-                    if (!mapID.Equals(MapManager.Map?.ID, StringComparison.OrdinalIgnoreCase))
-                        MapManager.LoadMap(mapID);
+                    if (LocalPlayer is Player localPlayer)
+                    {
+                        var mapID = MapID;
+                        if (!mapID.Equals(MapManager.Map?.ID, StringComparison.OrdinalIgnoreCase))
+                            MapManager.LoadMap(mapID);
 
-                    var map = MapManager.Map;
-                    if (map is not null && localPlayer.HasValidPosition)
-                    {
-                        DrawRadar(canvas, localPlayer, map, scale);
-                    }
-                    else if (MapManager.IsLoading)
-                    {
-                        DrawStatusMessage(canvas, "Loading Map", scale, animated: true);
+                        var map = MapManager.Map;
+                        if (map is not null && localPlayer.HasValidPosition)
+                        {
+                            Memory.DiagnosticStatus = "Active";
+                            DrawRadar(canvas, localPlayer, map, scale);
+                        }
+                        else if (MapManager.IsLoading)
+                        {
+                            Memory.DiagnosticStatus = "Parsing map geometry";
+                            DrawStatusMessage(canvas, "Loading Map", scale, animated: true);
+                        }
+                        else
+                        {
+                            if (map is null)
+                                Memory.DiagnosticStatus = $"Map '{mapID}' config not loaded";
+                            else if (!localPlayer.HasValidPosition)
+                                Memory.DiagnosticStatus = "Validating local player coordinates";
+
+                            DrawStatusMessage(canvas, "Waiting for Raid Start", scale, animated: true);
+                        }
                     }
                     else
                     {
-                        DrawStatusMessage(canvas, "Waiting for Raid Start", scale);
+                        if (string.IsNullOrEmpty(Memory.DiagnosticStatus) ||
+                            Memory.DiagnosticStatus == "Waiting for Raid Start" ||
+                            Memory.DiagnosticStatus == "Raid Active")
+                        {
+                            Memory.DiagnosticStatus = "Discovering LocalPlayer structure";
+                        }
+                        DrawStatusMessage(canvas, "Waiting for Raid Start", scale, animated: true);
                     }
                 }
                 else if (Memory.InHideout)
@@ -764,6 +784,15 @@ namespace eft_dma_radar.Silk.UI
                 return "[ WAITING FOR TARKOV ]";
             if (message.StartsWith("Starting", StringComparison.Ordinal))
                 return "[ INITIALIZING DMA INTERFACE ]";
+
+            // Use the rich real-time diagnostic status if available and not generic
+            if (!string.IsNullOrEmpty(Memory.DiagnosticStatus) &&
+                !Memory.DiagnosticStatus.Equals("Waiting for Raid Start", StringComparison.OrdinalIgnoreCase) &&
+                !Memory.DiagnosticStatus.Equals("Raid Active", StringComparison.OrdinalIgnoreCase))
+            {
+                return $"[ {Memory.DiagnosticStatus.ToUpperInvariant()} ]";
+            }
+
             if (message.StartsWith("Waiting", StringComparison.Ordinal))
                 return animated ? "[ MONITORING GAME PROCESS ]" : "[ STANDBY ]";
             if (message.StartsWith("Loading Map", StringComparison.Ordinal))

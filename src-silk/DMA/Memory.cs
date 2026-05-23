@@ -68,6 +68,7 @@ namespace eft_dma_radar.Silk.DMA
         public static ulong GameAssemblyBase { get; private set; }
         /// <summary>EFT game version read from PE version resource (e.g. "1.0.4.9.45133").</summary>
         public static string GameVersion { get; private set; } = string.Empty;
+        public static string DiagnosticStatus { get; set; } = "Initializing...";
         public static bool Ready => _state is MemoryState.ProcessFound or MemoryState.InRaid or MemoryState.InHideout;
         public static bool InRaid => _state is MemoryState.InRaid;
         public static bool InHideout => _state is MemoryState.InHideout;
@@ -146,6 +147,7 @@ namespace eft_dma_radar.Silk.DMA
 
         private static void OnRaidStarted()
         {
+            DiagnosticStatus = "Raid Active";
             SetState(MemoryState.InRaid);
             GCSettings.LatencyMode = GCLatencyMode.SustainedLowLatency;
             RaidStarted?.Invoke(null, EventArgs.Empty);
@@ -153,6 +155,7 @@ namespace eft_dma_radar.Silk.DMA
 
         private static void OnRaidStopped()
         {
+            DiagnosticStatus = "Waiting for Raid Start";
             if (_state is MemoryState.InRaid or MemoryState.InHideout)
                 SetState(MemoryState.ProcessFound);
             GCSettings.LatencyMode = GCLatencyMode.Interactive;
@@ -253,6 +256,18 @@ namespace eft_dma_radar.Silk.DMA
                                 Log.WriteLine($"[Memory] Still waiting for DMA device... (attempt {attempt})");
                             Log.WriteLine($"[Memory] Attempt {attempt} failed ({ex.Message}), retrying in 3s...");
                             StartupConsole.PrintDmaAttempt(attempt, connected: false);
+
+                            // Every 5 attempts, probe FT601 and show USB visibility status
+                            if (attempt % 5 == 0)
+                            {
+                                uint ft601 = ProbeUsbDeviceCount();
+                                Log.WriteLine($"[Memory] FT601 USB devices visible: {ft601}");
+                                if (ft601 == 0)
+                                    StartupConsole.PrintUsbDiag("FT601 not seen by driver — try a different USB 3.0 port or reboot");
+                                else
+                                    StartupConsole.PrintUsbDiag($"FT601 visible ({ft601} device(s)) — driver sees it, VMM init still failing");
+                            }
+
                             Thread.Sleep(3000);
                         }
                     }
@@ -304,6 +319,18 @@ namespace eft_dma_radar.Silk.DMA
         /// then kills it and waits for the device to settle. This makes first-launch reliable
         /// without requiring a manual warm-up script.
         /// </summary>
+        private static uint ProbeUsbDeviceCount()
+        {
+            try
+            {
+                [DllImport("FTD3XX.dll", CallingConvention = CallingConvention.Cdecl)]
+                static extern uint FT_CreateDeviceInfoList(out uint n);
+                FT_CreateDeviceInfoList(out uint c);
+                return c;
+            }
+            catch { return 0; }
+        }
+
         private static void WarmUpFt601(string deviceStr)
         {
             string[] candidates =
@@ -459,6 +486,7 @@ namespace eft_dma_radar.Silk.DMA
             StartupConsole.ResetErrorState(); // ensure each new session prints a fresh error block
             Log.WriteLine("[Memory] Waiting for game process...");
             StartupConsole.PrintStep("Game", "Waiting for EscapeFromTarkov.exe...", StepState.Pending);
+            DiagnosticStatus = "Waiting for Tarkov process...";
             SetState(MemoryState.WaitingForProcess);
             var cooldown = Stopwatch.StartNew();
 
@@ -475,6 +503,7 @@ namespace eft_dma_radar.Silk.DMA
                     LoadProcess();
 
                     // Retry module loading — game may still be initializing
+                    DiagnosticStatus = "Waiting for game modules to load...";
                     bool modulesReady = false;
                     for (int i = 0; i < 10; i++)
                     {
@@ -512,6 +541,7 @@ namespace eft_dma_radar.Silk.DMA
                     WaitForTypeInfoTable();
 
                     StartupConsole.PrintStep("Offsets", "Loading from memory...", StepState.Pending);
+                    DiagnosticStatus = "Loading game offsets from memory...";
                     eft_dma_radar.Silk.Tarkov.Unity.IL2CPP.Il2CppDumper.Dump();
                     // NOTE: CameraManager.Initialize() (AllCameras sig-scan + camera_offsets.json)
                     // is intentionally deferred to Phase 4 (Aimview). Not needed for Phase 1.
@@ -521,6 +551,7 @@ namespace eft_dma_radar.Silk.DMA
                     Log.WriteLine("[Memory] Game startup OK.");
                     Notify("Game startup OK", NotificationLevel.Info);
                     StartupConsole.PrintStep("Radar", "Started — waiting for raid", StepState.Ok);
+                    DiagnosticStatus = "Waiting for Raid Start";
                     return;
                 }
                 catch (Exception ex)
@@ -545,6 +576,7 @@ namespace eft_dma_radar.Silk.DMA
                 {
                     var ct = _cts.Token;
 
+                    DiagnosticStatus = "Waiting for Raid Start";
                     using var game = Game = LocalGameWorld.Create(ct);
 
                     if (game.IsHideout)
@@ -552,6 +584,7 @@ namespace eft_dma_radar.Silk.DMA
                         if (SilkProgram.Config.HideoutEnabled)
                         {
                             Log.WriteLine("[Memory] Entered hideout.");
+                            DiagnosticStatus = "In Hideout";
                             RunHideoutLoop(game, ct);
                         }
                         else

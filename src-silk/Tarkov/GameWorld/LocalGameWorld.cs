@@ -275,6 +275,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     var gameWorld = FindGameWorld();
                     if (gameWorld == 0)
                     {
+                        Memory.DiagnosticStatus = "Waiting for GameWorld base...";
                         Log.WriteRateLimited(AppLogLevel.Info, "gw_zero", TimeSpan.FromSeconds(10),
                             "[LocalGameWorld] GameWorld not found yet — waiting for raid...");
                         Thread.Sleep(500);
@@ -284,6 +285,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     // Reject stale GameWorld from a previous raid (Unity keeps it alive on stats/loading screen)
                     if (gameWorld == Interlocked.Read(ref _lastDisposedBase))
                     {
+                        Memory.DiagnosticStatus = "Discarding stale GameWorld...";
                         Log.WriteRateLimited(AppLogLevel.Info, "gw_stale", TimeSpan.FromSeconds(10),
                             $"[LocalGameWorld] Stale GameWorld @ 0x{gameWorld:X} — waiting for new raid...");
                         Thread.Sleep(1000);
@@ -294,6 +296,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     if (!Memory.TryReadPtr(gameWorld + Offsets.ClientLocalGameWorld.MainPlayer, out var mainPlayerPtr, false)
                         || mainPlayerPtr == 0)
                     {
+                        Memory.DiagnosticStatus = "GameWorld found. Waiting for MainPlayer...";
                         Log.WriteRateLimited(AppLogLevel.Info, "gw_search", TimeSpan.FromSeconds(5),
                             "[LocalGameWorld] GameWorld found but no MainPlayer yet — waiting for raid...");
                         Thread.Sleep(500);
@@ -306,6 +309,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     // Validate BEFORE constructing the instance (which spawns workers).
                     if (!IsLocalPlayerInRaid(gameWorld))
                     {
+                        Memory.DiagnosticStatus = "Waiting for player list registration...";
                         Log.WriteRateLimited(AppLogLevel.Info, "gw_noraid", TimeSpan.FromSeconds(5),
                             "[LocalGameWorld] GameWorld found but player list not ready — waiting...");
                         Thread.Sleep(500);
@@ -314,6 +318,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
                     if (!ValidateTransformReadable(mainPlayerPtr))
                     {
+                        Memory.DiagnosticStatus = "Validating player skeleton transforms...";
                         Log.WriteRateLimited(AppLogLevel.Info, "gw_stale_xform", TimeSpan.FromSeconds(5),
                             $"[LocalGameWorld] GameWorld @ 0x{gameWorld:X} — transform unreadable. Waiting...");
                         Thread.Sleep(1000);
@@ -325,6 +330,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     if (!mapId.Equals(HideoutMapID, StringComparison.OrdinalIgnoreCase)
                         && !MapManager.IsKnownMap(mapId))
                     {
+                        Memory.DiagnosticStatus = $"Unrecognized map ID '{mapId}'...";
                         Log.WriteRateLimited(AppLogLevel.Info, "gw_unknown_map", TimeSpan.FromSeconds(10),
                             $"[LocalGameWorld] Map '{mapId}' not in config — not a recognised raid. Waiting...");
                         Thread.Sleep(1000);
@@ -340,6 +346,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     MatchingProgressResolver.NotifyRaidStarted();
 
                     Log.WriteLine($"[LocalGameWorld] Found live GameWorld @ 0x{gameWorld:X}, map = '{mapId}'");
+                    Memory.DiagnosticStatus = "Raid World Found";
                     return new LocalGameWorld(gameWorld, mapId, ct);
                 }
                 catch (Memory.GameNotRunningException)
@@ -738,6 +745,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 // "Waiting for Raid Start" and transitions seamlessly once position is available.
                 if (_localPlayerAddr == 0)
                 {
+                    Memory.DiagnosticStatus = "Discovering LocalPlayer structure...";
                     if (!TryDiscoverLocalPlayer())
                         return;
                 }

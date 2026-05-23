@@ -41,17 +41,12 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 scatter.PrepareReadValue<bool>(entry.Player.ObservedIsAimingAddr);
 
             // Observed player: batch movement-controller fields into the same scatter round.
-            // These coalesce in the DMA pipeline since they're within ~256 bytes of each other.
+            // Coalesced adjacent fields are read as a single 104-byte contiguous block.
             if (entry.IsObserved && entry.ObservedMovementCtrlAddr != 0)
             {
                 ulong mc = entry.ObservedMovementCtrlAddr;
                 scatter.PrepareReadValue<float>(mc + Offsets.ObservedMovementController.CurrentTilt);
-                scatter.PrepareReadValue<float>(mc + Offsets.ObservedMovementController.ActualLinearSpeed);
-                scatter.PrepareReadValue<int>(mc + Offsets.ObservedMovementController.CurrentPlayerPose);
-                scatter.PrepareReadValue<float>(mc + Offsets.ObservedMovementController.PoseLevel);
-                scatter.PrepareReadValue<bool>(mc + Offsets.ObservedMovementController.IsGrounded);
-                scatter.PrepareReadValue<Vector3>(mc + Offsets.ObservedMovementController.Velocity);
-                scatter.PrepareReadValue<float>(mc + Offsets.ObservedMovementController.SmoothedFootYaw);
+                scatter.PrepareReadValue<Offsets.ObservedMovementController.ObservedMovementData>(mc + 0xCC);
             }
         }
 
@@ -185,22 +180,23 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 ulong mc = entry.ObservedMovementCtrlAddr;
                 if (scatter.ReadValue<float>(mc + Offsets.ObservedMovementController.CurrentTilt, out var tilt) && float.IsFinite(tilt))
                     entry.Player.Tilt = tilt;
-                if (scatter.ReadValue<float>(mc + Offsets.ObservedMovementController.ActualLinearSpeed, out var spd) && float.IsFinite(spd))
-                    entry.Player.LinearSpeed = spd;
-                if (scatter.ReadValue<int>(mc + Offsets.ObservedMovementController.CurrentPlayerPose, out var pose))
-                    entry.Player.Pose = pose;
-                if (scatter.ReadValue<float>(mc + Offsets.ObservedMovementController.PoseLevel, out var poseLvl) && float.IsFinite(poseLvl))
-                    entry.Player.PoseLevel = poseLvl;
-                if (scatter.ReadValue<bool>(mc + Offsets.ObservedMovementController.IsGrounded, out var grounded))
-                    entry.Player.IsGrounded = grounded;
-                if (scatter.ReadValue<Vector3>(mc + Offsets.ObservedMovementController.Velocity, out var vel)
-                    && float.IsFinite(vel.X) && float.IsFinite(vel.Y) && float.IsFinite(vel.Z))
-                    entry.Player.Velocity = vel;
-                if (scatter.ReadValue<float>(mc + Offsets.ObservedMovementController.SmoothedFootYaw, out var footYaw) && float.IsFinite(footYaw))
+
+                if (scatter.ReadValue<Offsets.ObservedMovementController.ObservedMovementData>(mc + 0xCC, out var mData))
                 {
-                    float by = footYaw % 360f;
-                    if (by < 0f) by += 360f;
-                    entry.Player.BodyYaw = by;
+                    if (float.IsFinite(mData.ActualLinearSpeed))
+                        entry.Player.LinearSpeed = mData.ActualLinearSpeed;
+                    entry.Player.Pose = mData.CurrentPlayerPose;
+                    if (float.IsFinite(mData.PoseLevel))
+                        entry.Player.PoseLevel = mData.PoseLevel;
+                    entry.Player.IsGrounded = mData.IsGrounded;
+                    if (float.IsFinite(mData.Velocity.X) && float.IsFinite(mData.Velocity.Y) && float.IsFinite(mData.Velocity.Z))
+                        entry.Player.Velocity = mData.Velocity;
+                    if (float.IsFinite(mData.SmoothedFootYaw))
+                    {
+                        float by = mData.SmoothedFootYaw % 360f;
+                        if (by < 0f) by += 360f;
+                        entry.Player.BodyYaw = by;
+                    }
                 }
             }
 

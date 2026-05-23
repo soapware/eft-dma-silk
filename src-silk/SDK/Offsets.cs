@@ -437,6 +437,17 @@ namespace SDK
             public static uint IsGrounded           = 0xF4; // bool
             public static uint SmoothedFootYaw      = 0x12C; // float — body/foot yaw degrees
             public static uint SmoothedAimRotation  = 0x130; // float — smoothed aim yaw degrees
+
+            [StructLayout(LayoutKind.Explicit, Size = 104)]
+            public struct ObservedMovementData
+            {
+                [FieldOffset(0)]  public float ActualLinearSpeed;
+                [FieldOffset(16)] public int CurrentPlayerPose;
+                [FieldOffset(24)] public float PoseLevel;
+                [FieldOffset(40)] public bool IsGrounded;
+                [FieldOffset(44)] public Vector3 Velocity;
+                [FieldOffset(96)] public float SmoothedFootYaw;
+            }
         }
         public readonly partial struct ObservedHandsController
         {

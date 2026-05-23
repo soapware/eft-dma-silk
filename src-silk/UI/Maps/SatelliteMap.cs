@@ -2,7 +2,11 @@
 // Licensed under the PolyForm Noncommercial License 1.0.0.
 // See LICENSE in the repository root for details.
 
+using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Catalog = eft_dma_radar.Silk.UI.Maps.SatelliteMapCatalog;
 
 namespace eft_dma_radar.Silk.UI.Maps
@@ -25,6 +29,8 @@ namespace eft_dma_radar.Silk.UI.Maps
 
         // Tile cache keyed by (z, x, y) packed into a long.
         private readonly ConcurrentDictionary<long, SKImage?> _tiles = new();
+        // Tracks last accessed ticks for LRU cache eviction.
+        private readonly ConcurrentDictionary<long, long> _tileAccessTicks = new();
         // Tracks in-flight loads so we don't fire duplicates per frame.
         private readonly ConcurrentDictionary<long, byte> _pending = new();
         private readonly CancellationTokenSource _cts = new();
@@ -114,7 +120,14 @@ namespace eft_dma_radar.Silk.UI.Maps
 
                     // Store even nulls so we don't retry 404s forever this session.
                     if (!_tiles.TryAdd(k, img))
+                    {
                         img?.Dispose();
+                    }
+                    else if (img is not null)
+                    {
+                        _tileAccessTicks[k] = DateTime.UtcNow.Ticks;
+                        EvictOldTiles();
+                    }
                 }
                 catch (OperationCanceledException) { }
                 catch (Exception ex)
@@ -180,6 +193,7 @@ namespace eft_dma_radar.Silk.UI.Maps
                     continue;
                 }
                 if (img is null) continue;
+                _tileAccessTicks[k] = DateTime.UtcNow.Ticks;
 
                 float px = tx * tilePxAtBase;
                 float py = ty * tilePxAtBase;
@@ -209,6 +223,8 @@ namespace eft_dma_radar.Silk.UI.Maps
                 long k = Key(curZ, curX, curY);
                 if (!_tiles.TryGetValue(k, out var img) || img is null)
                     continue;
+
+                _tileAccessTicks[k] = DateTime.UtcNow.Ticks;
 
                 // Crop the ancestor tile to the sub-region representing (tx,ty,z).
                 int levels = z - curZ;
@@ -282,6 +298,37 @@ namespace eft_dma_radar.Silk.UI.Maps
             return new SKRect(cx - hw, cy - hh, cx + hw, cy + hh);
         }
 
+        private void EvictOldTiles()
+        {
+            const int MaxMemoryTiles = 256;
+            const int TargetMemoryTiles = 192; // 75% of 256
+
+            if (_tileAccessTicks.Count <= MaxMemoryTiles)
+                return;
+
+            lock (_tiles)
+            {
+                if (_tileAccessTicks.Count <= MaxMemoryTiles)
+                    return;
+
+                var oldest = _tileAccessTicks
+                    .Select(kv => new { Key = kv.Key, Ticks = kv.Value })
+                    .OrderBy(x => x.Ticks)
+                    .ToList();
+
+                int toEvict = _tileAccessTicks.Count - TargetMemoryTiles;
+                for (int i = 0; i < Math.Min(toEvict, oldest.Count); i++)
+                {
+                    long key = oldest[i].Key;
+                    if (_tiles.TryRemove(key, out var img))
+                    {
+                        img?.Dispose();
+                    }
+                    _tileAccessTicks.TryRemove(key, out _);
+                }
+            }
+        }
+
         public void Dispose()
         {
             if (_disposed) return;
@@ -291,6 +338,7 @@ namespace eft_dma_radar.Silk.UI.Maps
                 img?.Dispose();
             _tiles.Clear();
             _pending.Clear();
+            _tileAccessTicks.Clear();
             _cts.Dispose();
         }
     }

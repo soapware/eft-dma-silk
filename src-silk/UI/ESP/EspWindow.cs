@@ -43,6 +43,7 @@ namespace eft_dma_radar.Silk.UI.ESP
         private static int _fpsCounter;
         private static int _fps;
         private static long _lastFpsTick;
+        private static long _lastRenderTimestamp;
 
         // Player standing height offset (feet → head) in world units (fallback only)
         private const float PlayerHeight = 1.8f;
@@ -417,10 +418,44 @@ namespace eft_dma_radar.Silk.UI.ESP
 
         #region Render Loop
 
+        private static void PrecisionSleep(long targetTimestamp)
+        {
+            while (System.Diagnostics.Stopwatch.GetTimestamp() < targetTimestamp)
+            {
+                long remainingTicks = targetTimestamp - System.Diagnostics.Stopwatch.GetTimestamp();
+                double remainingMs = (double)remainingTicks * 1000 / System.Diagnostics.Stopwatch.Frequency;
+                if (remainingMs > 2.0)
+                {
+                    Thread.Sleep(1);
+                }
+                else if (remainingMs > 0.05)
+                {
+                    Thread.Yield();
+                }
+                else
+                {
+                    Thread.SpinWait(10);
+                }
+            }
+        }
+
         private static void OnRender(double delta)
         {
             if (_grContext is null || _skSurface is null || _gl is null)
                 return;
+
+            long targetFps = Config.EspTargetFps;
+            if (targetFps > 0)
+            {
+                long targetTicksPerFrame = System.Diagnostics.Stopwatch.Frequency / targetFps;
+                long currentTimestamp = System.Diagnostics.Stopwatch.GetTimestamp();
+                long elapsedTicks = currentTimestamp - _lastRenderTimestamp;
+                if (elapsedTicks < targetTicksPerFrame)
+                {
+                    PrecisionSleep(_lastRenderTimestamp + targetTicksPerFrame);
+                }
+            }
+            _lastRenderTimestamp = System.Diagnostics.Stopwatch.GetTimestamp();
 
             ApplyWindowOpacity(); // no-op if unchanged
 

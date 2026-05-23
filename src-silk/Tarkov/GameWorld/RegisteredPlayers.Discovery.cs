@@ -73,10 +73,21 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 else
                 {
                     // Local / Client player — read from profile
+                    if (isLocal) Memory.DiagnosticStatus = "Walking LocalPlayer profile pointer...";
                     var profilePtr = Memory.ReadPtr(playerBase + Offsets.Player.Profile, false);
+                    if (isLocal && profilePtr == 0) Memory.DiagnosticStatus = "Walking Profile pointer... (profilePtr is 0)";
+
+                    if (isLocal) Memory.DiagnosticStatus = "Walking LocalPlayer profile info pointer...";
                     var infoPtr = Memory.ReadPtr(profilePtr + Offsets.Profile.Info, false);
+                    if (isLocal && infoPtr == 0) Memory.DiagnosticStatus = "Walking Info pointer... (infoPtr is 0)";
+
+                    if (isLocal) Memory.DiagnosticStatus = "Resolving LocalPlayer profile nickname...";
                     var nicknamePtr = Memory.ReadPtr(infoPtr + Offsets.PlayerInfo.Nickname, false);
+                    if (isLocal && nicknamePtr == 0) Memory.DiagnosticStatus = "Resolving Nickname... (nicknamePtr is 0)";
+
                     name = Memory.ReadUnityString(nicknamePtr, 64, false);
+                    if (isLocal && string.IsNullOrWhiteSpace(name)) Memory.DiagnosticStatus = "Resolving Nickname... (name is empty)";
+
                     sideRaw = Memory.ReadValue<int>(infoPtr + Offsets.PlayerInfo.Side, false);
                     type = isLocal ? PlayerType.Default : ResolveClientPlayerType(sideRaw);
                     Log.Write(AppLogLevel.Debug, $"[RegisteredPlayers]   Client player: name='{name}' side={sideRaw} type={type}");

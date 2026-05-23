@@ -103,6 +103,12 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
             public uint GameAssemblySizeOfImage { get; set; }
 
             /// <summary>
+            /// Game version read from EscapeFromTarkov.exe via Memory.GameVersion.
+            /// Used to auto-invalidate offsets upon an EFT patch.
+            /// </summary>
+            public string GameVersion { get; set; } = string.Empty;
+
+            /// <summary>
             /// All static offset fields from every nested struct inside
             /// <see cref="Offsets"/>, keyed as "StructName.FieldName".
             /// Values are stored as strings to handle both uint and ulong cleanly.
@@ -136,6 +142,7 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
                     TypeInfoTableRva = Offsets.Special.TypeInfoTableRva,
                     GameAssemblyTimestamp = timestamp,
                     GameAssemblySizeOfImage = sizeOfImage,
+                    GameVersion = Memory.GameVersion,
                     Fields = CollectAllFields(),
                 };
 
@@ -224,6 +231,14 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
                     return false;
                 }
 
+                if (!string.IsNullOrEmpty(Memory.GameVersion) && cache.GameVersion != Memory.GameVersion)
+                {
+                    Log.WriteLine(
+                        $"[Il2CppDumper] Cache GameVersion mismatch: cached='{cache.GameVersion}' " +
+                        $"current='{Memory.GameVersion}' — performing live dump.");
+                    return false;
+                }
+
                 if (cache.TypeInfoTableRva != expectedRva)
                 {
                     Log.WriteLine(
@@ -261,6 +276,12 @@ namespace eft_dma_radar.Silk.Tarkov.Unity.IL2CPP
                 var cache = TryReadAnyCache(out var src);
                 if (cache is null)
                     return false;
+
+                if (!string.IsNullOrEmpty(Memory.GameVersion) && cache.GameVersion != Memory.GameVersion)
+                {
+                    Log.WriteLine($"[Il2CppDumper] Cache GameVersion mismatch: cached='{cache.GameVersion}' current='{Memory.GameVersion}' — performing fresh dump.");
+                    return false;
+                }
 
                 if (cache.GameAssemblyTimestamp != timestamp || cache.GameAssemblySizeOfImage != sizeOfImage)
                 {

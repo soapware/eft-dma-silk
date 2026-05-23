@@ -978,43 +978,96 @@ document.querySelectorAll(".loot-presets button[data-price]").forEach(btn => {
    ═══════════════════════════════════════════════════════════════════════════ */
 let radarData = null;
 let pollTimer = null;
+let sseSource = null;
 let _lastMapId = null;
+
+function handleRadarData(data) {
+  radarData = data;
+
+  const inRaid    = !!(radarData?.inRaid ?? radarData?.inGame);
+  const inHideout = !!(radarData?.inHideout);
+  const statusText = radarData?.status ?? (inRaid ? "In Raid" : "Waiting for Raid Start");
+  statusLabel.textContent = statusText;
+  statusEl.className = inRaid ? "ok" : inHideout ? "warn" : "warn";
+
+  const mapId = radarData?.mapID ?? "unknown";
+  if (mapId !== _lastMapId) {
+    _lastMapId = mapId;
+    if (state.questsOnlyActiveMap) rebuildQuestList();
+  }
+  const pc = Array.isArray(radarData?.players) ? radarData.players.length : 0;
+  subline.textContent = inRaid
+    ? `${mapId} · ${pc} player${pc !== 1 ? "s" : ""}`
+    : statusText !== "In Raid" ? "\u2014" : `${mapId} · ${pc} player${pc !== 1 ? "s" : ""}`;
+
+  updatePlayerCounts(radarData?.players);
+}
+
+function handleRadarError() {
+  radarData = null;
+  statusLabel.textContent = "Disconnected";
+  statusEl.className = "bad";
+  subline.textContent = "waiting\u2026";
+  updatePlayerCounts(null);
+}
 
 async function fetchRadar() {
   try {
     const res = await fetch("/api/radar", { cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
-    radarData = await res.json();
-
-    const inRaid    = !!(radarData?.inRaid ?? radarData?.inGame);
-    const inHideout = !!(radarData?.inHideout);
-    const statusText = radarData?.status ?? (inRaid ? "In Raid" : "Waiting for Raid Start");
-    statusLabel.textContent = statusText;
-    statusEl.className = inRaid ? "ok" : inHideout ? "warn" : "warn";
-
-    const mapId = radarData?.mapID ?? "unknown";
-    if (mapId !== _lastMapId) {
-      _lastMapId = mapId;
-      if (state.questsOnlyActiveMap) rebuildQuestList();
-    }
-    const pc = Array.isArray(radarData?.players) ? radarData.players.length : 0;
-    subline.textContent = inRaid
-      ? `${mapId} · ${pc} player${pc !== 1 ? "s" : ""}`
-      : statusText !== "In Raid" ? "\u2014" : `${mapId} · ${pc} player${pc !== 1 ? "s" : ""}`;
-
-    updatePlayerCounts(radarData?.players);
-  } catch {
-    radarData = null;
-    statusLabel.textContent = "Disconnected";
-    statusEl.className = "bad";
-    subline.textContent = "waiting\u2026";
-    updatePlayerCounts(null);
+    const data = await res.json();
+    handleRadarData(data);
+  } catch (err) {
+    handleRadarError();
   }
 }
 
 function startPolling() {
+  if (sseSource) {
+    sseSource.close();
+    sseSource = null;
+  }
   if (pollTimer) clearInterval(pollTimer);
+  fetchRadar();
   pollTimer = setInterval(fetchRadar, state.pollMs);
+}
+
+function startSse() {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+  if (sseSource) {
+    sseSource.close();
+    sseSource = null;
+  }
+
+  console.log("[WebRadar] Connecting to Server-Sent Events stream...");
+  sseSource = new EventSource("/api/radar/sse");
+
+  sseSource.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      handleRadarData(data);
+    } catch (err) {
+      console.error("[WebRadar] SSE parse error:", err);
+    }
+  };
+
+  sseSource.onerror = (err) => {
+    console.warn("[WebRadar] SSE connection error, falling back to HTTP polling...", err);
+    sseSource.close();
+    sseSource = null;
+    startPolling();
+  };
+}
+
+function initConnection() {
+  if (window.EventSource) {
+    startSse();
+  } else {
+    startPolling();
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -4282,8 +4335,7 @@ updatePresetChip();
 rebuildWishlistList();
 rebuildBlacklistList();
 rebuildItemSearchResults();
-startPolling();
-fetchRadar();
+initConnection();
 fetchContainerTypes();
 fetchQuestData();
 fetchItemCatalog();

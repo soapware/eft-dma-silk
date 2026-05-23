@@ -236,7 +236,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Explosives
         {
             const float dt        = 0.05f;
             const float gravity   = -9.81f;
-            const int   maxSteps  = 200;
+            const int   maxSteps  = 100;
             // Floor clamp: stop the arc when it descends below the player's feet level.
             // Use a slightly generous offset (3m) to account for terrain that drops below
             // the throw origin (e.g. throwing off an elevated position).

@@ -7,6 +7,9 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Text;
+using System.Collections.Concurrent;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -37,6 +40,7 @@ namespace eft_dma_radar.Silk.Web
         // and removing races between the worker mutating _latest and the request thread
         // serializing it. Volatile read/write guarantees the reference flip is visible.
         private static byte[] _latestJson = Array.Empty<byte>();
+        private static readonly ConcurrentDictionary<HttpContext, TaskCompletionSource> _sseClients = new();
         private static WebRadarQuestData? _questDataCache;
         private static WebApplication? _host;
         private static WorkerThread? _worker;
@@ -138,6 +142,29 @@ namespace eft_dma_radar.Silk.Web
                 ctx.Response.ContentLength = bytes.Length;
                 return Results.Bytes(bytes, "application/json; charset=utf-8");
             });
+            _host.MapGet("/api/radar/sse", async (HttpContext ctx) =>
+            {
+                ctx.Response.Headers.ContentType = "text/event-stream";
+                ctx.Response.Headers.CacheControl = "no-cache";
+                ctx.Response.Headers.Connection = "keep-alive";
+
+                await ctx.Response.Body.FlushAsync();
+
+                var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                _sseClients[ctx] = tcs;
+
+                try
+                {
+                    await tcs.Task.WaitAsync(ctx.RequestAborted);
+                }
+                catch (OperationCanceledException)
+                {
+                }
+                finally
+                {
+                    _sseClients.TryRemove(ctx, out _);
+                }
+            });
             _host.MapGet("/api/containers", (HttpContext ctx) =>
             {
                 // Selected-container set can change at runtime via the desktop UI,
@@ -220,6 +247,12 @@ namespace eft_dma_radar.Silk.Web
             _worker = null;
             w?.Dispose();
             w?.Join(TimeSpan.FromSeconds(2));
+
+            foreach (var kvp in _sseClients)
+            {
+                kvp.Value.TrySetResult();
+            }
+            _sseClients.Clear();
 
             if (_host is not null)
             {
@@ -460,6 +493,7 @@ namespace eft_dma_radar.Silk.Web
                     {
                         var bytes = JsonSerializer.SerializeToUtf8Bytes(update, _jsonOpts);
                         Volatile.Write(ref _latestJson, bytes);
+                        _ = BroadcastSseAsync(bytes);
                     }
                     catch (Exception ex)
                     {
@@ -469,6 +503,43 @@ namespace eft_dma_radar.Silk.Web
             catch (Exception ex)
             {
                 Log.WriteLine($"[WebRadar] Worker error: {ex.Message}");
+            }
+        }
+
+        private static async Task BroadcastSseAsync(byte[] jsonBytes)
+        {
+            if (_sseClients.IsEmpty) return;
+
+            var dataPrefix = Encoding.UTF8.GetBytes("data: ");
+            var dataSuffix = Encoding.UTF8.GetBytes("\n\n");
+
+            var payload = new byte[dataPrefix.Length + jsonBytes.Length + dataSuffix.Length];
+            Buffer.BlockCopy(dataPrefix, 0, payload, 0, dataPrefix.Length);
+            Buffer.BlockCopy(jsonBytes, 0, payload, dataPrefix.Length, jsonBytes.Length);
+            Buffer.BlockCopy(dataSuffix, 0, payload, dataPrefix.Length + jsonBytes.Length, dataSuffix.Length);
+
+            var tasks = new List<Task>(_sseClients.Count);
+            foreach (var client in _sseClients.Keys)
+            {
+                tasks.Add(WriteToClientAsync(client, payload));
+            }
+
+            await Task.WhenAll(tasks);
+        }
+
+        private static async Task WriteToClientAsync(HttpContext ctx, byte[] payload)
+        {
+            try
+            {
+                await ctx.Response.Body.WriteAsync(payload);
+                await ctx.Response.Body.FlushAsync();
+            }
+            catch
+            {
+                if (_sseClients.TryRemove(ctx, out var tcs))
+                {
+                    tcs.TrySetResult();
+                }
             }
         }
 

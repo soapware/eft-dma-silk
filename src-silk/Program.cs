@@ -99,6 +99,21 @@ namespace eft_dma_radar.Silk
                 foreach (var dll in new[] { "FTD3XX.dll", "leechcore.dll", "vmm.dll" })
                     NativeLibrary.Load(Path.Combine(baseDir, dll));
 
+                // Probe FT601 USB device count and attempt a soft reset before VMM init.
+                // If count > 0, the device is visible to the driver; cycle to clear any stale state.
+                // If count = 0, the device is not enumerated by Windows — user must replug or reboot.
+                uint ft601Count = ProbeFt601DeviceCount();
+                Log.WriteLine($"[FT601] USB device count: {ft601Count}");
+                if (ft601Count > 0)
+                {
+                    StartupConsole.PrintStep("USB", $"FT601 detected ({ft601Count} device(s))", StepState.Ok);
+                    TryResetFt601(baseDir);
+                }
+                else
+                {
+                    StartupConsole.PrintStep("USB", "FT601 not detected — check USB cable / Device Manager", StepState.Warn);
+                }
+
                 Memory.ModuleInit(Config);
 
                 SetHighPerformanceMode();
@@ -157,6 +172,19 @@ namespace eft_dma_radar.Silk
                 InputManager.Shutdown();
                 Memory.Close();
             }
+        }
+
+        /// <summary>Returns the number of FT601 USB devices currently visible to the FTD3XX driver.</summary>
+        private static uint ProbeFt601DeviceCount()
+        {
+            try
+            {
+                [DllImport("FTD3XX.dll", CallingConvention = CallingConvention.Cdecl)]
+                static extern uint FT_CreateDeviceInfoList(out uint numDevices);
+                FT_CreateDeviceInfoList(out uint count);
+                return count;
+            }
+            catch { return 0; }
         }
 
         /// <summary>

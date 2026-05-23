@@ -389,20 +389,43 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Interactables
         /// </summary>
         private void RefreshDoorStates()
         {
+            var config = SilkProgram.Config;
+            if (!config.ShowDoors)
+                return;
+
             var doors = _doors;
             if (doors.Count == 0)
                 return;
 
-            using var scatter = Memory.GetScatter(VmmFlags.NOCACHE);
+            // Collect active doors to refresh
+            var activeDoors = new List<Door>();
             for (int i = 0; i < doors.Count; i++)
-                scatter.PrepareReadValue<byte>(doors[i].Base + Offsets.Interactable._doorState);
+            {
+                var door = doors[i];
+                if (config.ShowKeyDoors)
+                {
+                    if (door.IsKeyHeld)
+                        activeDoors.Add(door);
+                }
+                else
+                {
+                    activeDoors.Add(door);
+                }
+            }
+
+            if (activeDoors.Count == 0)
+                return;
+
+            using var scatter = Memory.GetScatter(VmmFlags.NOCACHE);
+            for (int i = 0; i < activeDoors.Count; i++)
+                scatter.PrepareReadValue<byte>(activeDoors[i].Base + Offsets.Interactable._doorState);
 
             scatter.Execute();
 
-            for (int i = 0; i < doors.Count; i++)
+            for (int i = 0; i < activeDoors.Count; i++)
             {
-                if (scatter.ReadValue<byte>(doors[i].Base + Offsets.Interactable._doorState, out var state))
-                    doors[i].DoorState = (EDoorState)state;
+                if (scatter.ReadValue<byte>(activeDoors[i].Base + Offsets.Interactable._doorState, out var state))
+                    activeDoors[i].DoorState = (EDoorState)state;
             }
         }
 

@@ -917,6 +917,8 @@ namespace eft_dma_radar.Silk.Tarkov.Hideout
                 _persistentNeededCounts = NeededItemCounts;
                 _persistentFiRIds = NeededFiRItemIds;
 
+                GameWorld.Loot.LootFilter.Version++;
+
                 int upgradeable = 0, maxed = 0;
                 for (int a = 0; a < areas.Count; a++)
                 {

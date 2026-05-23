@@ -172,6 +172,11 @@ namespace eft_dma_radar.Silk.Config
         private long _dirtyTimestamp;
         private const long DebounceSaveMs = 500;
 
+        /// <summary>Global configuration state version index.</summary>
+        [JsonIgnore]
+        public uint Version { get; private set; }
+
+
         // ── Debug ───────────────────────────────────────────────────────────────
 
         /// <summary>
@@ -1015,6 +1020,7 @@ namespace eft_dma_radar.Silk.Config
         {
             _dirty = true;
             Interlocked.Exchange(ref _dirtyTimestamp, Environment.TickCount64);
+            Version++;
         }
 
         /// <summary>

@@ -181,11 +181,11 @@ namespace eft_dma_radar.Silk.UI
                     int visibleCount = 0;
                     foreach (var item in loot)
                     {
+                        if (!worldBounds.Contains(item.Position))
+                            continue;
                         int price = item.DisplayPrice;
                         var result = item.Evaluate(price);
                         if (!result.Visible)
-                            continue;
-                        if (!worldBounds.Contains(item.Position))
                             continue;
                         var sp = mapParams.ToScreenPos(MapParams.ToMapPos(item.Position, mapCfg));
                         float dy = item.Position.Y - playerY;
@@ -236,9 +236,9 @@ namespace eft_dma_radar.Silk.UI
                     {
                         if (hideSearched && container.Searched)
                             continue;
-                        if (!selectedIds.Contains(container.Id))
-                            continue;
                         if (!worldBounds.Contains(container.Position))
+                            continue;
+                        if (!selectedIds.Contains(container.Id))
                             continue;
                         var sp = mapParams.ToScreenPos(MapParams.ToMapPos(container.Position, mapCfg));
                         container.Draw(canvas, sp, showNames);
@@ -255,9 +255,9 @@ namespace eft_dma_radar.Silk.UI
                     var lp = localPlayer as Tarkov.GameWorld.Player.LocalPlayer;
                     foreach (var exfil in exfils)
                     {
-                        if (Config.HideInactiveExfils && lp is not null && !exfil.IsAvailableFor(lp))
-                            continue;
                         if (!worldBounds.Contains(exfil.Position))
+                            continue;
+                        if (Config.HideInactiveExfils && lp is not null && !exfil.IsAvailableFor(lp))
                             continue;
                         var sp = mapParams.ToScreenPos(MapParams.ToMapPos(exfil.Position, mapCfg));
                         exfil.Draw(canvas, sp, localPlayer);
@@ -320,6 +320,8 @@ namespace eft_dma_radar.Silk.UI
 
                     foreach (var loc in questLocations)
                     {
+                        if (!worldBounds.Contains(loc.Position))
+                            continue;
                         if (!showOptional && loc.Optional)
                             continue;
 
@@ -332,9 +334,6 @@ namespace eft_dma_radar.Silk.UI
                             _                                                         => showKill,
                         };
                         if (!typeAllowed)
-                            continue;
-
-                        if (!worldBounds.Contains(loc.Position))
                             continue;
 
                         // Distance cull

@@ -162,6 +162,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Quests
             RequiredItems = allRequiredItems;
             LocationConditions = allLocationConditions;
             AllCompletedConditions = allCompletedConditions;
+
+            Loot.LootFilter.Version++;
         }
 
         private void ProcessQuestEntry(

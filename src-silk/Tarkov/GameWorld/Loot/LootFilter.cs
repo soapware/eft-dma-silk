@@ -12,6 +12,21 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
     internal static class LootFilter
     {
         // ── Runtime state (not persisted) ────────────────────────────────────
+        private static string _lastSearchText = string.Empty;
+
+        /// <summary>Loot filter parameters version index.</summary>
+        public static uint Version { get; set; } = 0;
+
+        /// <summary>Combined loot state version index, merging config version and local filter parameters version.</summary>
+        public static uint GetStateVersion()
+        {
+            if (!string.Equals(_searchText, _lastSearchText, StringComparison.Ordinal))
+            {
+                _lastSearchText = _searchText;
+                Version++;
+            }
+            return SilkProgram.Config.Version ^ Version;
+        }
 
         /// <summary>Runtime name search text. Empty = no name filter.</summary>
         private static string _searchText = string.Empty;

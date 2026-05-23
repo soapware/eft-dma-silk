@@ -24,7 +24,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         private string? _cachedLabel;
         private int _cachedLabelKey = int.MinValue;
 
-        // Cached importance flag — updated by LootManager after each loot refresh
+        // Cached evaluation and price state
+        private LootFilter.FilterResult _cachedResult;
+        private uint _cachedStateVersion = 0;
+        private int _cachedDisplayPrice = -1;
         private bool _cachedImportant;
 
         public string Id { get; } = item.BsgId;
@@ -43,10 +46,37 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         public TarkovMarketItem MarketItem => _item;
 
         /// <summary>Effective display price (respects price source + price-per-slot).</summary>
-        public int DisplayPrice => LootFilter.GetDisplayPrice(_item);
+        public int DisplayPrice
+        {
+            get
+            {
+                uint stateVer = LootFilter.GetStateVersion();
+                if (_cachedDisplayPrice == -1 || _cachedStateVersion != stateVer)
+                {
+                    _cachedDisplayPrice = LootFilter.GetDisplayPrice(_item);
+                    _cachedStateVersion = stateVer;
+                    _cachedResult = EvaluateInternal(_cachedDisplayPrice);
+                    _cachedImportant = LootFilter.IsImportant(_cachedDisplayPrice);
+                }
+                return _cachedDisplayPrice;
+            }
+        }
 
         /// <summary>Full filter evaluation — visibility, importance, wishlist, category.</summary>
         public LootFilter.FilterResult Evaluate(int displayPrice)
+        {
+            uint stateVer = LootFilter.GetStateVersion();
+            if (_cachedStateVersion != stateVer || _cachedDisplayPrice == -1)
+            {
+                _cachedStateVersion = stateVer;
+                _cachedDisplayPrice = displayPrice;
+                _cachedResult = EvaluateInternal(displayPrice);
+                _cachedImportant = LootFilter.IsImportant(displayPrice);
+            }
+            return _cachedResult;
+        }
+
+        private LootFilter.FilterResult EvaluateInternal(int displayPrice)
         {
             if (IsQuestItem)
             {
@@ -84,7 +114,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         /// <summary>Whether the item passes current filter criteria.</summary>
         public bool ShouldDraw() => Evaluate(DisplayPrice).Visible;
 
-        /// <summary>Whether the item is highlighted as important (cached — call <see cref="RefreshImportance"/> to update).</summary>
+        /// <summary>Whether the item is highlighted as important (cached — updated on evaluation).</summary>
         public bool IsImportant => _cachedImportant;
 
         /// <summary>
@@ -92,7 +122,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         /// Called after loot list construction to avoid per-frame/per-door recomputation.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RefreshImportance() => _cachedImportant = LootFilter.IsImportant(DisplayPrice);
+        public void RefreshImportance()
+        {
+            _ = DisplayPrice;
+        }
 
         /// <summary>
         /// Draw this loot item on the radar canvas with full filter result.

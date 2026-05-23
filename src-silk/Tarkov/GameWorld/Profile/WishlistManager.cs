@@ -113,6 +113,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Profile
                 Items = next.ToFrozenDictionary(StringComparer.Ordinal);
             else
                 Items = FrozenDictionary<string, int>.Empty;
+
+            Loot.LootFilter.Version++;
         }
     }
 }

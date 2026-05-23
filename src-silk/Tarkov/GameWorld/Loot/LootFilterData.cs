@@ -49,6 +49,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         {
             _wishlistSet = Wishlist.ToFrozenSet(StringComparer.Ordinal);
             _blacklistSet = Blacklist.ToFrozenSet(StringComparer.Ordinal);
+            LootFilter.Version++;
         }
 
         // ── Mutation helpers ─────────────────────────────────────────────────

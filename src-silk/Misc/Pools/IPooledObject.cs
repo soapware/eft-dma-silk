@@ -20,15 +20,8 @@ namespace eft_dma_radar.Silk.Misc.Pools
         static T Rent() => ObjectPool.Rent();
         static void Return(T obj)
         {
-            if (obj is IPooledObject<T> p)
-            {
-                p.SetDefault();
-                ObjectPool.Return(obj);
-            }
-            else
-            {
-                Log.WriteLine($"CRITICAL: Cannot return '{obj.GetType()}' to pool.");
-            }
+            obj.SetDefault();
+            ObjectPool.Return(obj);
         }
 
         private static class ObjectPool

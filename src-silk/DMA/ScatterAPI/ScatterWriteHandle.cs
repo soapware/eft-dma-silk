@@ -34,7 +34,7 @@ namespace eft_dma_radar.Silk.DMA.ScatterAPI
                 throw new ArgumentException($"Invalid write address 0x{va:X}", nameof(va));
             if (!_handle.PrepareWriteValue<T>(va, in value))
                 throw new Exception("Failed to prepare scatter write entry.");
-            Interlocked.Increment(ref _count);
+            _count++;
         }
 
         /// <summary>Queues a by-ref value-type write.</summary>
@@ -45,7 +45,7 @@ namespace eft_dma_radar.Silk.DMA.ScatterAPI
                 throw new ArgumentException($"Invalid write address 0x{va:X}", nameof(va));
             if (!_handle.PrepareWriteValue<T>(va, in value))
                 throw new Exception("Failed to prepare scatter write entry.");
-            Interlocked.Increment(ref _count);
+            _count++;
         }
 
         /// <summary>Queues a buffer write.</summary>
@@ -57,7 +57,7 @@ namespace eft_dma_radar.Silk.DMA.ScatterAPI
             var bytes = MemoryMarshal.AsBytes(buffer);
             if (!_handle.PrepareWriteSpan<byte>(va, bytes))
                 throw new Exception("Failed to prepare scatter write buffer entry.");
-            Interlocked.Increment(ref _count);
+            _count++;
         }
 
         /// <summary>

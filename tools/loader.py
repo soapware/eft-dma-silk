@@ -14,9 +14,7 @@ import argparse
 import hashlib
 import subprocess
 from datetime import datetime
-from typing import Generator
 
-# Try importing serial for real-world interface connectivity
 try:
     import serial
     SERIAL_AVAILABLE = True
@@ -24,78 +22,170 @@ except ImportError:
     SERIAL_AVAILABLE = False
 
 
+# ─── Exit codes ───────────────────────────────────────────────────────────────
+
 class LoaderExitCode:
-    """Stable system exit codes mapping distinct failure classes."""
-    SUCCESS = 0
-    SYSTEM_ERROR = 1
-    CLI_ERROR = 2
-    DEVICE_NOT_FOUND = 10
-    ACCESS_DENIED = 11
+    """
+    Stable exit codes. Codes >128 are new and avoid collision with shell signal
+    offsets (128 + signum). Codes 0–30 are preserved from prior versions.
+    """
+    SUCCESS           = 0
+    SYSTEM_ERROR      = 1
+    CLI_ERROR         = 2
+    DEVICE_NOT_FOUND  = 10
+    ACCESS_DENIED     = 11
     PROTOCOL_MISMATCH = 12
-    TRANSFER_FAILED = 20
-    VERIFY_FAILED = 30
+    TRANSFER_FAILED   = 20
+    VERIFY_FAILED     = 30
+    DEVICE_BUSY       = 129   # port open refused — resource held by another process
+    TIMEOUT           = 130   # operation exceeded time budget
 
 
-class StructuredLogger:
+class FailureClass:
+    """Structured failure tags emitted in JSON logs for machine consumption."""
+    NO_DEVICE         = "no_device"
+    PERMISSION_DENIED = "permission_denied"
+    DEVICE_BUSY       = "device_busy"
+    PROTOCOL_MISMATCH = "protocol_mismatch"
+    TRANSFER_FAILED   = "transfer_failed"
+    VERIFY_FAILED     = "verify_failed"
+    SYSTEM_ERROR      = "system_error"
+
+
+# ─── ANSI helpers ─────────────────────────────────────────────────────────────
+
+_ANSI_RESET  = "\033[0m"
+_ANSI_BLUE   = "\033[94m"
+_ANSI_YELLOW = "\033[93m"
+_ANSI_RED    = "\033[91m"
+_ANSI_GREY   = "\033[90m"
+
+_SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+
+
+def _col(text: str, code: str, enabled: bool) -> str:
+    return f"{code}{text}{_ANSI_RESET}" if enabled else text
+
+
+# ─── UILogger ─────────────────────────────────────────────────────────────────
+
+class UILogger:
     """
-    Handles logging outputs.
-    Directs clean human-readable ANSI records to stdout or structured, flat JSON records to stderr.
+    Severity-aware, TTY-adaptive logger.
+
+    Interactive TTY  — in-place spinner line; severity-prefixed toasts on new lines.
+    Non-interactive  — one-line timestamped records per event; no spinners.
+    --json-log       — structured JSON objects to stderr; human output suppressed.
+    --no-color       — ANSI stripped regardless of TTY.
+
+    Warning dedup: the first WARNING is always shown. Subsequent warnings on the
+    same step are suppressed unless --hints is active.
     """
-    def __init__(self, json_mode: bool = False, verbose: bool = False, no_progress: bool = False):
-        self.json_mode = json_mode
-        self.verbose = verbose
-        self.no_progress = no_progress
 
-    def log(self, step: str, status: str, message: str, attempt: int = 1, err_code: int | None = None, progress_pct: float | None = None):
-        if self.json_mode:
-            record = {
-                "timestamp": datetime.utcnow().isoformat() + "Z",
-                "step": step,
-                "status": status,
-                "attempt": attempt,
-                "message": message
-            }
-            if err_code is not None:
-                record["error_code"] = err_code
-            if progress_pct is not None:
-                record["progress_pct"] = round(progress_pct, 2)
-            print(json.dumps(record), file=sys.stderr)
-        else:
-            ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            progress_str = f" [{progress_pct:.1f}%]" if progress_pct is not None else ""
-            err_str = f" (Exit: {err_code})" if err_code is not None else ""
-            
-            # Simple ANSI coloring based on status
-            color_prefix = ""
-            color_suffix = "\033[0m"
-            if status == "SUCCESS":
-                color_prefix = "\033[92m"  # Green
-            elif status in ("FAILED", "ERROR", "MISMATCH"):
-                color_prefix = "\033[91m"  # Red
-            elif status in ("TRYING", "RETRYING", "WARNING"):
-                color_prefix = "\033[93m"  # Yellow
-            else:
-                color_prefix = ""
-                color_suffix = ""
+    INFO    = "INFO"
+    WARNING = "WARNING"
+    ERROR   = "ERROR"
 
-            print(f"[{ts}] {step} -> {color_prefix}{status}{color_suffix}{progress_str}: {message}{err_str}")
+    def __init__(self, *, json_mode: bool = False, verbose: bool = False,
+                 no_color: bool = False, no_progress: bool = False, hints: bool = False):
+        self.json_mode   = json_mode
+        self.verbose     = verbose
+        self.hints       = hints
+        self.color       = not no_color and sys.stdout.isatty() and not json_mode
+        self.interactive = sys.stdout.isatty() and not json_mode and not no_progress
+        self._spin_i     = 0
+        self._line_len   = 0
+        self._warn_shown = False
 
-    def trace(self, direction: str, payload: bytes):
-        """Prints high-density packet level tracing if verbose mode is active. Redacts raw bytes."""
+    # ── severity methods ──────────────────────────────────────────────────────
+
+    def info(self, step: str, msg: str, *, attempt: int = 1, total: int = 5,
+             elapsed: float = 0.0, failure_class: str | None = None) -> None:
+        self._emit(self.INFO, step, msg, attempt=attempt, total=total,
+                   elapsed=elapsed, err_code=None, failure_class=failure_class)
+
+    def warning(self, step: str, msg: str, *, attempt: int, total: int,
+                elapsed: float, failure_class: str | None = None) -> None:
+        if self._warn_shown and not self.hints:
+            return
+        self._warn_shown = True
+        self._emit(self.WARNING, step, msg, attempt=attempt, total=total,
+                   elapsed=elapsed, err_code=None, failure_class=failure_class)
+
+    def error(self, step: str, msg: str, *, attempt: int, total: int,
+              elapsed: float, err_code: int, failure_class: str | None = None) -> None:
+        self._emit(self.ERROR, step, msg, attempt=attempt, total=total,
+                   elapsed=elapsed, err_code=err_code, failure_class=failure_class)
+
+    # ── spinner ───────────────────────────────────────────────────────────────
+
+    def tick(self, port: str, attempt: int, total: int, elapsed: float) -> None:
+        """Update in-place spinner line. No-op when non-interactive."""
+        if not self.interactive:
+            return
+        frame = _SPINNER_FRAMES[self._spin_i % len(_SPINNER_FRAMES)]
+        self._spin_i += 1
+        line = f"[ {frame} ] Connecting to {port} … attempt {attempt}/{total} ({int(elapsed)}s)"
+        pad = max(self._line_len, len(line))
+        sys.stdout.write(f"\r{line:<{pad}}")
+        sys.stdout.flush()
+        self._line_len = len(line)
+
+    def clear_line(self) -> None:
+        """Erase the spinner line before printing a toast."""
+        if self.interactive and self._line_len:
+            sys.stdout.write(f"\r{' ' * self._line_len}\r")
+            sys.stdout.flush()
+            self._line_len = 0
+
+    # ── verbose trace ─────────────────────────────────────────────────────────
+
+    def trace(self, direction: str, payload: bytes) -> None:
         if not self.verbose:
             return
         ts = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-        # Redact raw data for logging safety, only show packet sizing
-        redacted_payload = f"[{len(payload)} bytes payload data]"
-        print(f"\033[90m[{ts}] [TRACE] {direction}: {redacted_payload}\033[0m")
+        print(_col(f"[{ts}] TRACE {direction}: [{len(payload)} bytes]", _ANSI_GREY, self.color))
 
+    # ── internals ─────────────────────────────────────────────────────────────
+
+    def _emit(self, severity: str, step: str, msg: str, *, attempt: int, total: int,
+              elapsed: float, err_code: int | None, failure_class: str | None) -> None:
+        if self.json_mode:
+            rec: dict = {
+                "timestamp":      datetime.utcnow().isoformat() + "Z",
+                "step":           step,
+                "attempt":        attempt,
+                "total_attempts": total,
+                "elapsed_s":      round(elapsed, 2),
+                "severity":       severity,
+                "message":        msg,
+            }
+            if err_code is not None:
+                rec["error_code"] = err_code
+            if failure_class is not None:
+                rec["failure_class"] = failure_class
+            print(json.dumps(rec), file=sys.stderr)
+        else:
+            self.clear_line()
+            if severity == self.INFO:
+                prefix = _col("[INFO]", _ANSI_BLUE, self.color)
+            elif severity == self.WARNING:
+                prefix = _col("[WARN]", _ANSI_YELLOW, self.color)
+            else:
+                prefix = _col("[ERR ]", _ANSI_RED, self.color)
+            sfx    = f" (Exit: {err_code})" if err_code is not None else ""
+            ts_str = "" if self.interactive else f"[{datetime.now().strftime('%H:%M:%S')}] "
+            print(f"{ts_str}{prefix} {msg}{sfx}")
+
+
+# ─── HardwareInterface ────────────────────────────────────────────────────────
 
 class HardwareInterface:
     """
     Manages physical JTAG/UART serial bus transactions.
-    Supports mock/fallback configurations if the serial driver library is missing.
+    Falls back to a mock implementation when the pyserial library is absent.
     """
-    def __init__(self, port: str, baud: int, verbose: bool, logger: StructuredLogger):
+    def __init__(self, port: str, baud: int, verbose: bool, logger: UILogger):
         self.port = port
         self.baud = baud
         self.verbose = verbose
@@ -103,65 +193,57 @@ class HardwareInterface:
         self.serial_conn = None
         self._mock_attempts = 0
 
-    def open(self):
-        """Attempts connection to interface port. Categorizes hardware failures."""
+    def open(self) -> None:
+        """Attempt to open the hardware port. Raises typed exceptions on failure."""
         if SERIAL_AVAILABLE:
             try:
                 self.serial_conn = serial.Serial(
                     port=self.port,
                     baudrate=self.baud,
                     timeout=2.0,
-                    write_timeout=2.0
+                    write_timeout=2.0,
                 )
             except serial.SerialException as ex:
                 err_msg = str(ex).lower()
                 if "permission denied" in err_msg or "access is denied" in err_msg:
-                    raise PermissionError("Access Denied: Check dialout group membership or COM port permissions.")
+                    raise PermissionError("Access denied: check dialout group or COM port permissions.")
                 elif "not found" in err_msg or "does not exist" in err_msg:
-                    raise FileNotFoundError("Port not found: Target board offline or connection loose.")
+                    raise FileNotFoundError("Port not found: target board offline or connection loose.")
                 else:
-                    raise ConnectionError(f"Serial communications error: {str(ex)}")
+                    raise ConnectionError(f"Serial error: {ex}")
         else:
-            # Safe mock logic for local testing/CI fallback environments
             self._mock_attempts += 1
             if self._mock_attempts < 3:
-                raise ConnectionError("Port busy or target board powered off (Mock state).")
-            # Successful mock port opening after retry simulation
+                raise ConnectionError("Port busy or target board powered off (mock).")
 
-    def close(self):
-        """Safely closes device interface connections."""
+    def close(self) -> None:
         if self.serial_conn and self.serial_conn.is_open:
             self.serial_conn.close()
         self.serial_conn = None
 
     def write_chunk(self, data: bytes) -> bool:
-        """Transmits a single binary block with byte tracing."""
         self.logger.trace("WRITE", data)
         if SERIAL_AVAILABLE and self.serial_conn:
             self.serial_conn.write(data)
-            # Await acknowledgment byte
             ack = self.serial_conn.read(1)
             self.logger.trace("READ_ACK", ack)
-            return ack == b'\x06'  # standard ACK (0x06)
+            return ack == b'\x06'
         else:
-            time.sleep(0.01)  # Simulate serial delay
+            time.sleep(0.01)
             return True
 
     def query_verify_hash(self) -> str:
-        """Requests verification checksum from onboard controller."""
-        self.logger.trace("WRITE", b'\x05')  # request verification command
+        self.logger.trace("WRITE", b'\x05')
         if SERIAL_AVAILABLE and self.serial_conn:
             self.serial_conn.write(b'\x05')
             response = self.serial_conn.readline().decode().strip()
             self.logger.trace("READ_HASH", response.encode())
             return response
         else:
-            # Return simulated match hash (SHA-256 of empty/mock stream)
             return "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
-    def trigger_partition_rollback(self):
-        """Swaps active ARM registers back to golden boot image partition."""
-        self.logger.trace("WRITE", b'\x15')  # rollback command (0x15)
+    def trigger_partition_rollback(self) -> None:
+        self.logger.trace("WRITE", b'\x15')
         if SERIAL_AVAILABLE and self.serial_conn:
             try:
                 self.serial_conn.write(b'\x15')
@@ -170,11 +252,10 @@ class HardwareInterface:
                 pass
 
 
+# ─── JobDaemon ────────────────────────────────────────────────────────────────
+
 class JobDaemon:
-    """
-    Manages background job creation, logging, and status tracking.
-    Enables --background transfers.
-    """
+    """Manages background job creation, log routing, and state tracking."""
     JOB_DIR = os.path.expanduser("~/.loader/jobs")
 
     @classmethod
@@ -189,36 +270,28 @@ class JobDaemon:
 
     @classmethod
     def create_background_subprocess(cls, args) -> str:
-        job_id = f"Job_{int(time.time())}_{args.port.replace('/', '_').replace('.', '_')}"
-        log_path = cls.get_job_log_path(job_id)
+        job_id     = f"Job_{int(time.time())}_{args.port.replace('/', '_').replace('.', '_')}"
+        log_path   = cls.get_job_log_path(job_id)
         state_path = cls.get_job_state_path(job_id)
 
-        # Store initial execution state
         with open(state_path, "w") as sf:
             json.dump({"status": "IN_PROGRESS", "progress": 0.0}, sf)
 
-        # Spawn identical command without --background
         cmd = [sys.executable, __file__]
         for arg in sys.argv[1:]:
             if arg not in ("--background", "-bg"):
                 cmd.append(arg)
 
-        # Direct outputs to the background job log file
         log_file = open(log_path, "w")
-        subprocess.Popen(
-            cmd,
-            stdout=log_file,
-            stderr=log_file,
-            close_fds=True,
-            start_new_session=True
-        )
-
+        subprocess.Popen(cmd, stdout=log_file, stderr=log_file,
+                         close_fds=True, start_new_session=True)
         return job_id
 
     @classmethod
-    def update_job_state(cls, job_id: str, status: str, progress: float | None = None, err_code: int | None = None):
+    def update_job_state(cls, job_id: str, status: str,
+                         progress: float | None = None, err_code: int | None = None) -> None:
         state_path = cls.get_job_state_path(job_id)
-        state = {"status": status, "updated_at": datetime.utcnow().isoformat() + "Z"}
+        state: dict = {"status": status, "updated_at": datetime.utcnow().isoformat() + "Z"}
         if progress is not None:
             state["progress"] = progress
         if err_code is not None:
@@ -230,154 +303,212 @@ class JobDaemon:
             pass
 
     @classmethod
-    def print_job_status(cls, job_id: str):
+    def print_job_status(cls, job_id: str) -> None:
         state_path = cls.get_job_state_path(job_id)
-        log_path = cls.get_job_log_path(job_id)
+        log_path   = cls.get_job_log_path(job_id)
 
         if not os.path.exists(state_path):
-            print(f"Error: Job ID '{job_id}' does not exist or has been removed.")
+            print(f"Error: job '{job_id}' not found.")
             sys.exit(LoaderExitCode.CLI_ERROR)
 
         with open(state_path, "r") as sf:
             state = json.load(sf)
 
-        status = state.get("status", "UNKNOWN")
+        status   = state.get("status", "UNKNOWN")
         progress = state.get("progress", 0.0)
-        err = state.get("error_code")
+        err      = state.get("error_code")
 
-        print("="*60)
+        print("=" * 60)
         print(f"Background Job ID: {job_id}")
         print(f"Job Status:        [{status}]")
         print(f"Progress:          {progress:.1f}%")
         if err is not None:
             print(f"Error Code:        {err}")
         print(f"Log Location:      {log_path}")
-        print("="*60)
+        print("=" * 60)
 
 
-def display_spinner(attempt: int, port: str):
-    """Draws a neat ASCII console loading spinner for connections."""
-    chars = ["|", "/", "-", "\\"]
-    idx = int(time.time() * 4) % len(chars)
-    sys.stdout.write(f"\r\033[93m[ {chars[idx]} ]\033[0m Connecting to {port} (attempt {attempt}/5)...")
-    sys.stdout.flush()
-
+# ─── Pipeline ─────────────────────────────────────────────────────────────────
 
 def run_pipeline(args) -> int:
-    logger = StructuredLogger(json_mode=args.json_log, verbose=args.verbose, no_progress=args.no_progress)
-    logger.log("PIPELINE", "INIT", "Initializing hardware loader execution pipeline...")
+    max_att = args.max_attempts
+    logger = UILogger(
+        json_mode=args.json_log,
+        verbose=args.verbose,
+        no_color=args.no_color,
+        no_progress=args.no_progress,
+        hints=args.hints,
+    )
+    logger.info("PIPELINE", "Initializing firmware loader …", attempt=1, total=max_att)
 
-    # Verification of local source file existence
     if not os.path.exists(args.file):
-        logger.log("PIPELINE", "ERROR", f"Specified binary file not found: {args.file}", err_code=LoaderExitCode.CLI_ERROR)
+        logger.error("PIPELINE", f"Firmware file not found: {args.file}",
+                     attempt=1, total=max_att, elapsed=0.0,
+                     err_code=LoaderExitCode.CLI_ERROR,
+                     failure_class=FailureClass.SYSTEM_ERROR)
         return LoaderExitCode.CLI_ERROR
 
-    # 1. Connection Phase
+    # ── 1. Connection phase ───────────────────────────────────────────────────
     hw = HardwareInterface(args.port, args.baud, args.verbose, logger)
     attempt = 0
     backoff = 1.0
     connected = False
+    t0 = time.monotonic()
+    failure_cls = FailureClass.NO_DEVICE
 
-    while attempt < args.attempts:
+    while attempt < max_att:
         attempt += 1
-        logger.log("CONNECT", "TRYING", f"Opening communications on {args.port}...", attempt=attempt)
-        
-        # Interactive UI loading spinner
-        if not args.no_progress and not args.json_log:
-            for _ in range(10):
-                display_spinner(attempt, args.port)
-                time.sleep(0.1)
-            sys.stdout.write("\r\033[K")  # Clear line
-            sys.stdout.flush()
+        elapsed = time.monotonic() - t0
+
+        if not logger.interactive:
+            logger.info("CONNECT", f"Opening {args.port} …",
+                        attempt=attempt, total=max_att, elapsed=elapsed)
+
+        # Spin for up to 0.5s while the port open is attempted
+        for _ in range(10):
+            logger.tick(args.port, attempt, max_att, time.monotonic() - t0)
+            time.sleep(0.05)
 
         try:
             hw.open()
+            elapsed = time.monotonic() - t0
             connected = True
-            logger.log("CONNECT", "SUCCESS", f"Established physical interface link on attempt {attempt}.")
+            logger.clear_line()
+            logger.info("CONNECT", f"Connected on attempt {attempt} (took {int(elapsed)}s).",
+                        attempt=attempt, total=max_att, elapsed=elapsed)
             break
+
         except PermissionError as ex:
-            logger.log("CONNECT", "ACCESS_DENIED", str(ex), attempt=attempt, err_code=LoaderExitCode.ACCESS_DENIED)
+            elapsed = time.monotonic() - t0
+            detail  = f" Detail: {ex}" if args.verbose else ""
+            logger.error(
+                "CONNECT",
+                f"Access denied on {args.port} — check dialout group or COM port permissions.{detail}",
+                attempt=attempt, total=max_att, elapsed=elapsed,
+                err_code=LoaderExitCode.ACCESS_DENIED,
+                failure_class=FailureClass.PERMISSION_DENIED,
+            )
             return LoaderExitCode.ACCESS_DENIED
+
         except FileNotFoundError as ex:
-            logger.log("CONNECT", "FAILED", str(ex), attempt=attempt, err_code=LoaderExitCode.DEVICE_NOT_FOUND)
+            failure_cls = FailureClass.NO_DEVICE
+            if args.verbose:
+                logger.info("CONNECT", f"Port not found: {ex}",
+                            attempt=attempt, total=max_att, elapsed=time.monotonic() - t0)
+
         except Exception as ex:
-            logger.log("CONNECT", "FAILED", f"Link offline: {str(ex)}", attempt=attempt, err_code=LoaderExitCode.DEVICE_NOT_FOUND)
+            failure_cls = FailureClass.NO_DEVICE
+            if args.verbose:
+                logger.info("CONNECT", f"Link offline: {ex}",
+                            attempt=attempt, total=max_att, elapsed=time.monotonic() - t0)
 
-        # Attempt 3 User-UX warning guidelines
-        if attempt == 3:
-            print("\n" + "\033[93m" + "="*80)
-            print("HINT: Still unable to communicate with device.")
-            print(" * Verify hardware power cables, JTAG locks, and board DIP boot mode configurations.")
-            print(" * Check that correct UART drivers (FTDI / Silicon Labs) are active.")
-            print(" * To abort, press Ctrl+C. To debug full traces, rerun with --verbose.")
-            print("="*80 + "\033[0m\n")
+        elapsed = time.monotonic() - t0
 
-        # Exponential backoff pacing
-        if attempt < args.attempts:
-            time.sleep(backoff)
+        # Escalation: warn once when attempts reach the configured threshold
+        if attempt >= args.warning_threshold:
+            logger.warning(
+                "CONNECT",
+                f"Still connecting after {attempt} attempts — check power, cable, and device "
+                f"boot mode; use --verbose for traces or --max-attempts to allow more retries.",
+                attempt=attempt, total=max_att, elapsed=elapsed,
+                failure_class=failure_cls,
+            )
+
+        if attempt < max_att:
+            wait = int(backoff)
+            logger.info("CONNECT", f"Retrying in {wait}s — device may still be initializing.",
+                        attempt=attempt, total=max_att, elapsed=elapsed)
+            backoff_end = time.monotonic() + backoff
+            while time.monotonic() < backoff_end:
+                logger.tick(args.port, attempt + 1, max_att, time.monotonic() - t0)
+                time.sleep(0.1)
             backoff *= 2.0
 
     if not connected:
-        logger.log("PIPELINE", "ABORTED", f"Connection failed after {args.attempts} attempts.", err_code=LoaderExitCode.DEVICE_NOT_FOUND)
+        elapsed = time.monotonic() - t0
+        logger.clear_line()
+        logger.error(
+            "CONNECT",
+            f"Connection failed after {max_att} attempts — verify device is powered and JTAG cable is seated.",
+            attempt=attempt, total=max_att, elapsed=elapsed,
+            err_code=LoaderExitCode.DEVICE_NOT_FOUND,
+            failure_class=failure_cls,
+        )
         return LoaderExitCode.DEVICE_NOT_FOUND
 
-    # 2. BIST/PLL Warm-up Phase
+    # ── 2. BIST/PLL warm-up ───────────────────────────────────────────────────
     if not args.force:
-        logger.log("PLL_LOCK", "WARNING", "First connection: takes longer due to device initialization — please wait up to 30s.")
-        time.sleep(1.0)  # Simulated clock lock verification delay
+        logger.info("PLL_LOCK", "First connection: device may take up to 30s to initialize — please wait.",
+                    attempt=1, total=1, elapsed=time.monotonic() - t0)
+        time.sleep(1.0)
 
-    # 3. Binary Reading & Hash Calculation
-    logger.log("IMAGE", "HASHING", f"Reading and verifying local checksum: {args.file}")
+    # ── 3. Binary reading & hash calculation ──────────────────────────────────
+    elapsed = time.monotonic() - t0
+    logger.info("IMAGE", f"Reading and hashing {args.file} …",
+                attempt=1, total=1, elapsed=elapsed)
     sha256 = hashlib.sha256()
     try:
         with open(args.file, "rb") as f:
             file_data = f.read()
             sha256.update(file_data)
     except Exception as ex:
-        logger.log("IMAGE", "ERROR", f"Read exception: {str(ex)}", err_code=LoaderExitCode.SYSTEM_ERROR)
+        elapsed = time.monotonic() - t0
+        logger.error("IMAGE", f"Could not read firmware file: {ex}",
+                     attempt=1, total=1, elapsed=elapsed,
+                     err_code=LoaderExitCode.SYSTEM_ERROR,
+                     failure_class=FailureClass.SYSTEM_ERROR)
         hw.close()
         return LoaderExitCode.SYSTEM_ERROR
 
     expected_hash = sha256.hexdigest()
     file_size = len(file_data)
-    logger.log("IMAGE", "READY", f"Image size: {file_size} bytes. SHA-256: {expected_hash}")
+    elapsed = time.monotonic() - t0
+    logger.info("IMAGE", f"Image ready — {file_size} bytes, SHA-256: {expected_hash[:16]}…",
+                attempt=1, total=1, elapsed=elapsed)
 
-    # 4. Transfer & Verification Loop
-    chunk_size = args.chunk_size
-    total_chunks = (file_size + chunk_size - 1) // chunk_size
-    verify_attempts = 0
-    max_verify_attempts = 3
-    verify_succeeded = False
+    # ── 4. Transfer & verification loop ──────────────────────────────────────
+    chunk_size         = args.chunk_size
+    total_chunks       = (file_size + chunk_size - 1) // chunk_size
+    verify_attempts    = 0
+    max_verify         = 3
+    verify_succeeded   = False
 
-    while verify_attempts < max_verify_attempts:
+    while verify_attempts < max_verify:
         verify_attempts += 1
-        logger.log("TRANSFER", "STARTING", f"Uploading image blocks (Attempt {verify_attempts}/{max_verify_attempts})...")
-        
+        elapsed = time.monotonic() - t0
+        logger.info("TRANSFER",
+                    f"Uploading image — attempt {verify_attempts}/{max_verify} …",
+                    attempt=verify_attempts, total=max_verify, elapsed=elapsed)
+
         try:
             write_failed = False
             for i in range(total_chunks):
                 start = i * chunk_size
-                end = min(start + chunk_size, file_size)
+                end   = min(start + chunk_size, file_size)
                 block = file_data[start:end]
-                
-                # Check link write ACK
+
                 if not hw.write_chunk(block):
-                    logger.log("TRANSFER", "FAILED", f"ACK dropped on block {i+1}/{total_chunks}", err_code=LoaderExitCode.TRANSFER_FAILED)
+                    elapsed = time.monotonic() - t0
+                    logger.warning(
+                        "TRANSFER",
+                        f"ACK dropped on block {i + 1}/{total_chunks} — link may be unstable; retrying transfer.",
+                        attempt=verify_attempts, total=max_verify, elapsed=elapsed,
+                        failure_class=FailureClass.TRANSFER_FAILED,
+                    )
                     write_failed = True
                     break
-                
+
                 pct = ((i + 1) / total_chunks) * 100.0
-                
-                # Update background job tracking if in subprocess
                 if args.background_job_id:
                     JobDaemon.update_job_state(args.background_job_id, "IN_PROGRESS", progress=pct)
 
                 if not args.no_progress and not args.json_log:
-                    # Renders inline terminal progress updates safely
-                    sys.stdout.write(f"\r[ Uploading ] Block {i+1}/{total_chunks} [{pct:.1f}% Complete]")
+                    sys.stdout.write(f"\r[ Uploading ] Block {i + 1}/{total_chunks} [{pct:.1f}%]")
                     sys.stdout.flush()
                 elif args.json_log and (i + 1) % max(1, total_chunks // 10) == 0:
-                    logger.log("TRANSFER", "IN_PROGRESS", f"Uploaded blocks {i+1}/{total_chunks}", progress_pct=pct)
+                    elapsed = time.monotonic() - t0
+                    logger.info("TRANSFER", f"Uploaded {i + 1}/{total_chunks} blocks.",
+                                attempt=verify_attempts, total=max_verify, elapsed=elapsed)
 
             if not args.no_progress and not args.json_log:
                 sys.stdout.write("\n")
@@ -386,61 +517,134 @@ def run_pipeline(args) -> int:
             if write_failed:
                 continue
 
-            # Query post-write verification hash
-            logger.log("VERIFY", "TRYING", "Requesting hardware verification hash...")
+            elapsed = time.monotonic() - t0
+            logger.info("VERIFY", "Requesting device verification hash …",
+                        attempt=verify_attempts, total=max_verify, elapsed=elapsed)
             device_hash = hw.query_verify_hash()
-            
-            # Allow fallback bypass on force environments
+
             if args.force:
-                logger.log("VERIFY", "BYPASSED", "Bypassed integrity checks (--force mode active).")
+                elapsed = time.monotonic() - t0
+                logger.info("VERIFY", "Integrity check bypassed (--force active).",
+                            attempt=verify_attempts, total=max_verify, elapsed=elapsed)
                 verify_succeeded = True
                 break
 
             if device_hash == expected_hash:
-                logger.log("VERIFY", "SUCCESS", "Target verification hash matches source binary!")
+                elapsed = time.monotonic() - t0
+                logger.info("VERIFY", "Device hash matches — firmware verified.",
+                            attempt=verify_attempts, total=max_verify, elapsed=elapsed)
                 verify_succeeded = True
                 break
             else:
-                logger.log("VERIFY", "MISMATCH", f"Device returned: {device_hash} (Expected: {expected_hash})", err_code=LoaderExitCode.VERIFY_FAILED)
-        
-        except Exception as ex:
-            logger.log("TRANSFER", "ERROR", f"Physical write error: {str(ex)}", err_code=LoaderExitCode.TRANSFER_FAILED)
+                elapsed = time.monotonic() - t0
+                logger.warning(
+                    "VERIFY",
+                    f"Hash mismatch on attempt {verify_attempts}/{max_verify} — retrying.",
+                    attempt=verify_attempts, total=max_verify, elapsed=elapsed,
+                    failure_class=FailureClass.VERIFY_FAILED,
+                )
 
-    # 5. Pipeline Finalization / Fallback Rollback
+        except Exception as ex:
+            elapsed = time.monotonic() - t0
+            msg = f"Write error on attempt {verify_attempts}: {ex}" if args.verbose \
+                  else f"Write error on attempt {verify_attempts} — retrying."
+            logger.warning("TRANSFER", msg,
+                           attempt=verify_attempts, total=max_verify, elapsed=elapsed,
+                           failure_class=FailureClass.TRANSFER_FAILED)
+
+    # ── 5. Finalization / rollback ────────────────────────────────────────────
+    elapsed = time.monotonic() - t0
     if verify_succeeded:
-        logger.log("PIPELINE", "SUCCESS", "Device firmware loaded successfully.")
+        logger.info("PIPELINE", f"Firmware loaded successfully (total time: {int(elapsed)}s).",
+                    attempt=1, total=1, elapsed=elapsed)
         hw.close()
         if args.background_job_id:
-            JobDaemon.update_job_state(args.background_job_id, "SUCCESS", progress=100.0, err_code=LoaderExitCode.SUCCESS)
+            JobDaemon.update_job_state(args.background_job_id, "SUCCESS",
+                                       progress=100.0, err_code=LoaderExitCode.SUCCESS)
         return LoaderExitCode.SUCCESS
     else:
-        logger.log("PIPELINE", "FAILED", "Integrity checks consistently failed. Triggering recovery...", err_code=LoaderExitCode.VERIFY_FAILED)
-        
-        # Triggering ARM register fallback golden boot image restoration
-        logger.log("ROLLBACK", "TRYING", "Sending target recovery signals...")
+        logger.error(
+            "PIPELINE",
+            "Transfer integrity check failed after all attempts — firmware may be corrupt or link unstable.",
+            attempt=verify_attempts, total=max_verify, elapsed=elapsed,
+            err_code=LoaderExitCode.VERIFY_FAILED,
+            failure_class=FailureClass.VERIFY_FAILED,
+        )
+        logger.info("ROLLBACK", "Sending recovery signal to restore golden boot image …",
+                    attempt=1, total=1, elapsed=elapsed)
         hw.trigger_partition_rollback()
-        logger.log("ROLLBACK", "SUCCESS", "ARM boot partition reverted to original safe image configurations.")
+        elapsed = time.monotonic() - t0
+        logger.info("ROLLBACK", "Boot partition reverted to safe image.",
+                    attempt=1, total=1, elapsed=elapsed)
         hw.close()
-        
         if args.background_job_id:
-            JobDaemon.update_job_state(args.background_job_id, "FAILED", progress=0.0, err_code=LoaderExitCode.VERIFY_FAILED)
+            JobDaemon.update_job_state(args.background_job_id, "FAILED",
+                                       progress=0.0, err_code=LoaderExitCode.VERIFY_FAILED)
         return LoaderExitCode.VERIFY_FAILED
 
 
-def main():
+# ─── Entry point ──────────────────────────────────────────────────────────────
+
+def main() -> None:
     parser = argparse.ArgumentParser(description="Professional ARM+FPGA Firmware Loader Tool")
-    parser.add_argument("-p", "--port", type=str, default="/dev/ttyUSB0", help="Target hardware interface port.")
-    parser.add_argument("-b", "--baud", type=int, default=115200, help="Bus communication speed.")
-    parser.add_argument("-f", "--file", type=str, required=True, help="Path to firmware/bitstream source file.")
-    parser.add_argument("-c", "--chunk-size", type=int, default=4096, help="Data transmission chunk size.")
-    parser.add_argument("-a", "--attempts", type=int, default=5, help="Maximum hardware connection attempts.")
-    parser.add_argument("--json-log", action="store_true", help="Output event trace records in raw JSON formats.")
-    parser.add_argument("--verbose", action="store_true", help="Display full byte-level bus traces.")
-    parser.add_argument("--no-progress", action="store_true", help="Suppress terminal interactive spinners/progress bars.")
-    parser.add_argument("--force", action="store_true", help="Bypass validation safety checks.")
-    parser.add_argument("-bg", "--background", action="store_true", help="Run transfer task inside daemon process.")
-    parser.add_argument("--job-status", type=str, help="Check current execution status of specified job ID.")
-    parser.add_argument("--background-job-id", type=str, help=argparse.SUPPRESS) # Internal use
+
+    # ── Existing flags (preserved, backward-compatible) ──────────────────────
+    parser.add_argument("-p", "--port",
+                        type=str, default="/dev/ttyUSB0",
+                        help="Target hardware interface port.")
+    parser.add_argument("-b", "--baud",
+                        type=int, default=115200,
+                        help="Bus communication speed.")
+    parser.add_argument("-f", "--file",
+                        type=str, required=True,
+                        help="Path to firmware/bitstream source file.")
+    parser.add_argument("-c", "--chunk-size",
+                        type=int, default=4096,
+                        help="Data transmission chunk size.")
+    parser.add_argument("--json-log",
+                        action="store_true",
+                        help="Structured JSON events to stderr; suppresses human output.")
+    parser.add_argument("--verbose",
+                        action="store_true",
+                        help="Protocol traces and low-level error causes.")
+    parser.add_argument("--no-progress",
+                        action="store_true",
+                        help="Suppress spinner and progress bars.")
+    parser.add_argument("--force",
+                        action="store_true",
+                        help="Bypass verification safety checks.")
+    parser.add_argument("-bg", "--background",
+                        action="store_true",
+                        help="Run transfer inside a daemon process.")
+    parser.add_argument("--job-status",
+                        type=str,
+                        help="Check status of a background job by ID.")
+    parser.add_argument("--background-job-id",
+                        type=str, help=argparse.SUPPRESS)
+
+    # ── Connection attempt count — --attempts kept as a backward-compat alias ─
+    parser.add_argument(
+        "-a", "--attempts", "--max-attempts",
+        type=int, default=5, dest="max_attempts", metavar="N",
+        help="Maximum connection attempts (default: 5; --attempts is a legacy alias).",
+    )
+
+    # ── New flags ─────────────────────────────────────────────────────────────
+    parser.add_argument(
+        "--warning-threshold",
+        type=int, default=3, metavar="N",
+        help="Attempts before a WARNING is shown (default: 3).",
+    )
+    parser.add_argument(
+        "--no-color",
+        action="store_true",
+        help="Disable ANSI color output.",
+    )
+    parser.add_argument(
+        "--hints",
+        action="store_true",
+        help="Repeat warning hints on each attempt after the threshold.",
+    )
 
     args = parser.parse_args()
 
@@ -450,12 +654,12 @@ def main():
 
     if args.background:
         job_id = JobDaemon.create_background_subprocess(args)
-        print("="*60)
+        print("=" * 60)
         print("Background transfer successfully spawned.")
-        print(f"Job ID:        {job_id}")
-        print(f"Log Location:  {JobDaemon.get_job_log_path(job_id)}")
-        print(f"To query:      loader-tool --job-status {job_id}")
-        print("="*60)
+        print(f"Job ID:       {job_id}")
+        print(f"Log:          {JobDaemon.get_job_log_path(job_id)}")
+        print(f"Query:        loader.py --job-status {job_id}")
+        print("=" * 60)
         sys.exit(0)
 
     sys.exit(run_pipeline(args))

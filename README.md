@@ -1,15 +1,15 @@
+> **Fork of [eft-dma-radar-silk](https://github.com/HuiTeab/eft-dma-radar-silk) by [HuiTeab](https://github.com/HuiTeab).** Original work © HuiTeab, PolyForm Noncommercial License 1.0.0.
+> 
 # EFT (Silk.NET) — soapware fork
 
 A modern DMA (Direct Memory Access) radar overlay for **Escape from Tarkov** (Unity 2022.3.43f1 EFT build), built on [Silk.NET](https://github.com/dotnet/Silk.NET) (Windowing / Input / OpenGL), [ImGui.NET](https://github.com/ImGuiNET/ImGui.NET) panels, and [SkiaSharp](https://github.com/mono/SkiaSharp) 2D rendering. Ships with an embedded ASP.NET Core web radar.
 
-> **Fork of [eft-dma-radar-silk](https://github.com/HuiTeab/eft-dma-radar-silk) by [HuiTeab](https://github.com/HuiTeab).** Original work © HuiTeab, PolyForm Noncommercial License 1.0.0.
 
 > **Targeting the Unity 6 EFT build?** See the sibling repo [**eft-dma-radar-silk6**](https://github.com/HuiTeab/eft-dma-radar-silk6) — same UI, same web radar, same features; Unity 6000.3.6f1 engine offsets and IL2CPP layout.
 
 ---
 
 ## What's Different / New in this Repo
-### Mainly QOL additions
 
 - **OBS-proof software cursor** — magenta triangle cursor drawn in the ImGui foreground layer; stays visible when OBS game capture hides the hardware cursor. Toggle in Settings → General → Display.
 - **ESP loot category colors** — each loot label is colored by item category (Meds, Keys, Ammo, Food, Weapons, etc.) with a distinct hue. Toggle in Loot Filters → Options → ESP Category Colors.

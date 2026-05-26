@@ -80,9 +80,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Exits
         }
 
         /// <summary>
-        /// Updates status and reads eligible entry points / scav IDs.
-        /// </summary>
-        public void Update(int rawStatus)
+        public void Update(byte rawStatus)
         {
             Status = rawStatus switch
             {

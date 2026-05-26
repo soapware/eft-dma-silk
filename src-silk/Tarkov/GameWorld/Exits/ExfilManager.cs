@@ -21,7 +21,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Exits
         private int _initAttempts;
         private const int MaxInitAttempts = 20;
         private DateTime _lastRefresh;
-        private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(3);
+        private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(1);
 
         /// <summary>Current exfil snapshot (thread-safe read).</summary>
         public IReadOnlyList<Exfil> Exfils => _exfils;
@@ -65,16 +65,16 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Exits
 
             // Scatter-read status for all exfils in a single DMA round-trip
             using var map = ScatterReadMap.Get();
-            var round1 = map.AddRound();
+            var round1 = map.AddRound(false); // disable cache for real-time live updates
 
             for (int ix = 0; ix < exfils.Count; ix++)
             {
                 int i = ix;
                 var exfil = exfils[i];
-                round1[i].AddEntry<int>(0, exfil.StatusAddr);
+                round1[i].AddEntry<byte>(0, exfil.StatusAddr);
                 round1[i].Callbacks += index =>
                 {
-                    if (index.TryGetResult<int>(0, out var status))
+                    if (index.TryGetResult<byte>(0, out var status))
                         exfil.Update(status);
                 };
             }

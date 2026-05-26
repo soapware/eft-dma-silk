@@ -17,6 +17,7 @@ namespace eft_dma_radar.Silk.UI.Maps
         private readonly float _mapWidth;
         private readonly float _mapHeight;
         private bool _disposed;
+        private int _activeLayerIndex = -1;
 
         public string ID { get; }
         public MapConfig Config { get; }
@@ -128,25 +129,80 @@ namespace eft_dma_radar.Silk.UI.Maps
         /// </summary>
         public void Draw(SKCanvas canvas, float playerHeight, SKRect mapBounds, SKRect windowBounds)
         {
-            int lastIndex = -1;
+            int candidateIndex = -1;
 
-            // Pass 1: find the highest active layer index
+            // Pass 1: find the highest active layer index matching current raw playerHeight
             for (int i = 0; i < _layers.Length; i++)
             {
                 if (_layers[i].Layer.IsHeightInRange(playerHeight))
-                    lastIndex = i;
+                    candidateIndex = i;
             }
 
-            if (lastIndex < 0)
+            if (candidateIndex < 0)
                 return;
 
+            // Hysteresis buffer (0.75 meters) to prevent rapid level flipping near floor boundaries
+            const float HysteresisBuffer = 0.75f;
+
+            if (_activeLayerIndex == -1 || _activeLayerIndex >= _layers.Length)
+            {
+                _activeLayerIndex = candidateIndex;
+            }
+            else if (candidateIndex != _activeLayerIndex)
+            {
+                var currentLayer = _layers[_activeLayerIndex].Layer;
+                bool shouldSwitch = false;
+
+                if (candidateIndex > _activeLayerIndex)
+                {
+                    // Transitioning UP: Player must exceed current layer's MaxHeight + buffer
+                    if (currentLayer.MaxHeight.HasValue)
+                    {
+                        if (playerHeight > currentLayer.MaxHeight.Value + HysteresisBuffer)
+                            shouldSwitch = true;
+                    }
+                    else
+                    {
+                        // Current layer has no MaxHeight (e.g. base layer). Check candidate's MinHeight
+                        var candidateLayer = _layers[candidateIndex].Layer;
+                        if (candidateLayer.MinHeight.HasValue && playerHeight > candidateLayer.MinHeight.Value + HysteresisBuffer)
+                            shouldSwitch = true;
+                    }
+                }
+                else
+                {
+                    // Transitioning DOWN: Player must fall below current layer's MinHeight - buffer
+                    if (currentLayer.MinHeight.HasValue)
+                    {
+                        if (playerHeight < currentLayer.MinHeight.Value - HysteresisBuffer)
+                            shouldSwitch = true;
+                    }
+                    else
+                    {
+                        // Current layer has no MinHeight. Check candidate's MaxHeight
+                        var candidateLayer = _layers[candidateIndex].Layer;
+                        if (candidateLayer.MaxHeight.HasValue && playerHeight < candidateLayer.MaxHeight.Value - HysteresisBuffer)
+                            shouldSwitch = true;
+                    }
+                }
+
+                if (shouldSwitch)
+                {
+                    _activeLayerIndex = candidateIndex;
+                }
+            }
+
+            int lastIndex = _activeLayerIndex;
             bool disableDimming = Config.DisableDimming;
 
             // Pass 2: draw visible layers, dim non-top layers when applicable
             for (int i = 0; i <= lastIndex; i++)
             {
                 ref readonly var loaded = ref _layers[i];
-                if (!loaded.Layer.IsHeightInRange(playerHeight))
+
+                // Ensure the active layer, the base layer, or any intermediate layers matching player height are drawn.
+                bool inRange = i == lastIndex || loaded.Layer.IsBaseLayer || loaded.Layer.IsHeightInRange(playerHeight);
+                if (!inRange)
                     continue;
 
                 bool shouldDim =

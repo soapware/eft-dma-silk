@@ -11,8 +11,8 @@ A modern DMA (Direct Memory Access) radar overlay for **Escape from Tarkov** (Un
 
 ## What's Different / New in this Repo
 
-- **OBS-proof software cursor** — magenta triangle cursor drawn in the ImGui foreground layer; stays visible when OBS game capture hides the hardware cursor. Toggle in Settings → General → Display.
-- **ESP loot category colors** — each loot label is colored by item category (Meds, Keys, Ammo, Food, Weapons, etc.) with a distinct hue. Toggle in Loot Filters → Options → ESP Category Colors.
+- **OBS-proof software cursor** — drawn in the ImGui foreground layer; stays visible when OBS game capture hides the hardware cursor. Toggle in Settings → General → Display.
+- **ESP loot category colors** — each loot label is colored by item category (Meds, Keys, Ammo, Food, Weapons, etc.) Toggle in Loot Filters → Options → ESP Category Colors.
 - **ESP Visuals panel** — per-feature toggles (name label, health bar, weapon, distance, highlight), inline RGBA color pickers, box styles (Corners / Full / Top+Bottom bars), corner-fraction and line-thickness sliders, overlay opacity, name font selector, and health color thresholds.
 - **Key door blips** — scans held keys on raid entry and on inventory change; locked doors for which you hold the key are highlighted cyan on the radar map and labeled in the ESP overlay.
 - **Startup console** — phase-by-phase status panel replacing the raw debug console; DMA connection and speed shown with a red→yellow→green gradient; wave animation speed tied to DMA throughput.

@@ -48,7 +48,7 @@ eft-dma-radar-silk/
 
 ---
 
-## Build & Run
+## Building & Running
 
 ```powershell
 git clone https://github.com/soapware/eft-dma-silk.git

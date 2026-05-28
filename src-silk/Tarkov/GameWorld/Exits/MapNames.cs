@@ -24,14 +24,17 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Exits
                 ["laboratory"]      = "Labs",
                 ["interchange"]     = "Interchange",
                 ["factory4_day"]    = "Factory",
-                ["factory4_night"]  = "Factory",
+                ["factory4_night"]  = "Night Factory",
                 ["bigmap"]          = "Customs",
                 ["lighthouse"]      = "Lighthouse",
                 ["tarkovstreets"]   = "Streets",
                 ["Sandbox"]         = "Ground Zero",
-                ["Sandbox_high"]    = "Ground Zero",
+                ["Sandbox_high"]    = "Ground Zero (21+)",
+                ["Sandbox_start"]   = "Ground Zero Tutorial",
                 ["ground-zero"]     = "Ground Zero",
-                ["ground-zero-21"]  = "Ground Zero",
+                ["ground-zero-21"]  = "Ground Zero (21+)",
+                ["Icebreaker"]      = "Icebreaker",
+                ["Terminal_ui"]     = "Terminal",
             }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>

@@ -355,7 +355,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             ["BossSanitar"] = new("Sanitar", PlayerType.AIBoss),
             ["BossBully"] = new("Reshala", PlayerType.AIBoss),
             ["BossGluhar"] = new("Gluhar", PlayerType.AIBoss),
-            ["SectantPriest"] = new("Priest", PlayerType.AIBoss),
+            ["SectantPriest"] = new("Zryachiy", PlayerType.AIBoss),
             ["SectantWarrior"] = new("Cultist", PlayerType.AIRaider),
             ["BossKilla"] = new("Killa", PlayerType.AIBoss),
             ["BossTagilla"] = new("Tagilla", PlayerType.AIBoss),

@@ -40,7 +40,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
                 "5c0558060db834001b735271",
                 "57235b6f24597759bf5a30f1",
                 "5b3b6e495acfc4330140bd88",
-                "5a7c74b3e899ef0014332c29"
+                "5a7c74b3e899ef0014332c29",
+                "67506ca81f18589016006aa6",  // PNV-57E
+                "689b889473ebd6871805edd6",  // PVS-31A
             }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
         private static readonly FrozenSet<string> SkipSlots =

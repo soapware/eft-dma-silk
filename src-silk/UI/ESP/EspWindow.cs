@@ -36,6 +36,7 @@ namespace eft_dma_radar.Silk.UI.ESP
 
         // Borderless-windowed fullscreen state (F11 toggle)
         private static bool _fakeFullscreen;
+        private static bool _needRestoreFullscreen;
         private static Vector2D<int> _savedFsSize;
         private static Vector2D<int> _savedFsPos;
 
@@ -143,6 +144,21 @@ namespace eft_dma_radar.Silk.UI.ESP
             _running = false;
             try { _window?.Close(); } catch { }
             Log.WriteLine("[EspWindow] Close requested.");
+        }
+
+        /// <summary>
+        /// Closes the ESP window and blocks until the window thread exits (up to 5 s).
+        /// Call this before saving config so the ESP OnClosing handler has written its values.
+        /// </summary>
+        public static void CloseAndWait()
+        {
+            if (!_running)
+                return;
+
+            _running = false;
+            try { _window?.Close(); } catch { }
+            _thread?.Join(TimeSpan.FromSeconds(5));
+            Log.WriteLine("[EspWindow] CloseAndWait complete.");
         }
 
         /// <summary>
@@ -262,9 +278,8 @@ namespace eft_dma_radar.Silk.UI.ESP
                 // Apply saved opacity
                 ApplyWindowOpacity();
 
-                // Restore fullscreen if it was active on last close
-                if (Config.EspFullscreen)
-                    ToggleEspBorderlessFullscreen();
+                // Defer fullscreen restore to first render frame so _window.Position is valid
+                _needRestoreFullscreen = Config.EspFullscreen;
             }
             catch (Exception ex)
             {
@@ -320,7 +335,7 @@ namespace eft_dma_radar.Silk.UI.ESP
                 }
             }
 
-            Config.MarkDirty();
+            Config.Save();
 
             _input?.Dispose();
             _skSurface?.Dispose();
@@ -443,6 +458,12 @@ namespace eft_dma_radar.Silk.UI.ESP
         {
             if (_grContext is null || _skSurface is null || _gl is null)
                 return;
+
+            if (_needRestoreFullscreen)
+            {
+                _needRestoreFullscreen = false;
+                ToggleEspBorderlessFullscreen();
+            }
 
             long targetFps = Config.EspTargetFps;
             if (targetFps > 0)

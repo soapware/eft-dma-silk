@@ -189,9 +189,8 @@ namespace eft_dma_radar.Silk.UI
 
                 EspWindow.Open(); // always auto-start — single-launch experience
 
-                // Restore fullscreen if it was active on last close
-                if (Config.RadarFullscreen)
-                    ToggleRadarFullscreen();
+                // Defer fullscreen restore to first render frame so _window.Position is valid
+                _needRestoreFullscreen = Config.RadarFullscreen;
 
                 // Auto-open the hideout panel
                 Memory.HideoutEntered += static (_, _) => HideoutPanel.IsOpen = true;

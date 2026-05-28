@@ -71,10 +71,10 @@ namespace eft_dma_radar.Silk.UI
             Config.ShowPlayerWatchlistPanel = PlayerWatchlistPanel.IsOpen;
             Config.ShowEspWidget = EspWindow.IsOpen;
 
-            Config.Save();
+            // Close ESP window first and wait for its OnClosing to write config values
+            EspWindow.CloseAndWait();
 
-            // Close ESP window if open
-            EspWindow.Close();
+            Config.Save();
 
             // Signal the memory worker to stop cleanly before we release GPU resources
             Memory.Close();

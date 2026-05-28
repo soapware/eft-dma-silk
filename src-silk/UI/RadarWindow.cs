@@ -108,6 +108,7 @@ namespace eft_dma_radar.Silk.UI
 
         // Borderless-windowed fullscreen state (F11 toggle)
         private static bool _fakeFullscreen;
+        private static bool _needRestoreFullscreen;
         private static Vector2D<int> _savedFsSize;
         private static Vector2D<int> _savedFsPos;
 

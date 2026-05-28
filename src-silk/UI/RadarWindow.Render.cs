@@ -17,6 +17,12 @@ namespace eft_dma_radar.Silk.UI
             if (_grContext is null || _skSurface is null)
                 return;
 
+            if (_needRestoreFullscreen)
+            {
+                _needRestoreFullscreen = false;
+                ToggleRadarFullscreen();
+            }
+
             try
             {
                 // Frame setup

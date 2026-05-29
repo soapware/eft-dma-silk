@@ -187,10 +187,14 @@ namespace eft_dma_radar.Silk.UI
 
         private static void OnMouseScroll(IMouse mouse, ScrollWheel scroll)
         {
-            // ImGuiController handles scroll forwarding to io.MouseWheel internally.
-            // We only need to skip map zoom when ImGui has focus.
+            // ImGuiController v2.23.0 uses the old direct io.MouseWheel API which Dear ImGui 1.89+
+            // clears in NewFrame() before reading. Accumulate here and inject via AddMouseWheelEvent()
+            // (the correct queue-based API) after _imgui.Update() in DrawImGuiUI.
             if (ImGui.GetIO().WantCaptureMouse)
+            {
+                _pendingImGuiScroll += scroll.Y;
                 return;
+            }
 
             if (!InRaid)
                 return;

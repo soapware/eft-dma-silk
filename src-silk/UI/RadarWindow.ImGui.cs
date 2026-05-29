@@ -16,7 +16,16 @@ namespace eft_dma_radar.Silk.UI
         private static void DrawImGuiUI(ref Vector2D<int> fbSize, double delta)
         {
             _imgui.Update((float)delta);
-            ImGui.GetIO().FontGlobalScale = UIScale; // keep synced when user changes UIScale at runtime
+
+            // ImGuiController v2.23.0 uses the old direct io.MouseWheel path; Dear ImGui 1.89+ clears
+            // it in NewFrame() before reading, so scroll never reaches windows. Inject via the queue API.
+            var io = ImGui.GetIO();
+            if (_pendingImGuiScroll != 0f)
+            {
+                io.AddMouseWheelEvent(0f, _pendingImGuiScroll);
+                _pendingImGuiScroll = 0f;
+            }
+            io.FontGlobalScale = UIScale; // keep synced when user changes UIScale at runtime
 
             try
             {

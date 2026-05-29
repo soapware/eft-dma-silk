@@ -65,6 +65,9 @@ namespace eft_dma_radar.Silk.UI
         private static bool _playerCounterDragging;
         private static Vector2 _playerCounterDragOffset;
 
+        // ImGui scroll injection (accumulated from OnMouseScroll, injected via AddMouseWheelEvent)
+        private static float _pendingImGuiScroll;
+
         // Map state
         private static bool _freeMode;
         private static Vector2 _mapPanPosition;

@@ -787,7 +787,10 @@ namespace eft_dma_radar.Silk.UI
         private static string GetStatusSubLine(string message, bool animated)
         {
             if (message.StartsWith("Waiting for Tarkov", StringComparison.Ordinal))
-                return "[ WAITING FOR TARKOV ]";
+            {
+                var diag = Memory.DiagnosticStatus;
+                return !string.IsNullOrEmpty(diag) ? $"[ {diag.ToUpperInvariant()} ]" : "[ WAITING FOR TARKOV ]";
+            }
             if (message.StartsWith("Starting", StringComparison.Ordinal))
                 return "[ INITIALIZING DMA INTERFACE ]";
 

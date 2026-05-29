@@ -557,6 +557,7 @@ namespace eft_dma_radar.Silk.DMA
                 catch (Exception ex)
                 {
                     Log.WriteLine($"[Memory] Startup failed: {ex.Message}");
+                    DiagnosticStatus = ex.Message;
                     StartupConsole.PrintError("Startup failed", "Ensure EFT is fully launched on the target machine");
                     OnGameStopped();
                     Thread.Sleep(1000);

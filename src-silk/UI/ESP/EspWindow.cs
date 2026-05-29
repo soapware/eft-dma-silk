@@ -203,8 +203,8 @@ namespace eft_dma_radar.Silk.UI.ESP
                 options.Position = new Vector2D<int>(espX, espY);
                 options.Title    = "ESP Overlay  [F11 Fullscreen]";
                 options.VSync    = false;
-                options.FramesPerSecond   = Config.EspTargetFps;
-                options.UpdatesPerSecond  = Config.EspTargetFps;
+                options.FramesPerSecond   = 0;   // uncapped — PrecisionSleep in OnRender is the sole pacer
+                options.UpdatesPerSecond  = 0;   // no Update callback registered; don't run the update loop
                 options.PreferredStencilBufferBits = 8;
                 options.PreferredBitDepth = new Vector4D<int>(8, 8, 8, 8);
                 options.WindowBorder      = WindowBorder.Resizable;

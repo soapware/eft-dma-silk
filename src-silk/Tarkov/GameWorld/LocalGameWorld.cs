@@ -330,9 +330,19 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     if (!mapId.Equals(HideoutMapID, StringComparison.OrdinalIgnoreCase)
                         && !MapManager.IsKnownMap(mapId))
                     {
-                        Memory.DiagnosticStatus = $"Unrecognized map ID '{mapId}'...";
-                        Log.WriteRateLimited(AppLogLevel.Info, "gw_unknown_map", TimeSpan.FromSeconds(10),
-                            $"[LocalGameWorld] Map '{mapId}' not in config — waiting for raid...");
+                        if (mapId.Equals("unknown", StringComparison.OrdinalIgnoreCase))
+                        {
+                            // No recognized LocationId at any offset — likely in menus, cutscene, or trader shop
+                            Memory.DiagnosticStatus = "In menus or non-raid scene...";
+                            Log.WriteRateLimited(AppLogLevel.Info, "gw_unknown_map", TimeSpan.FromSeconds(10),
+                                "[LocalGameWorld] No recognized map ID — likely in menus or trader shop. Waiting...");
+                        }
+                        else
+                        {
+                            Memory.DiagnosticStatus = $"Unrecognized map ID '{mapId}'...";
+                            Log.WriteRateLimited(AppLogLevel.Info, "gw_unknown_map", TimeSpan.FromSeconds(10),
+                                $"[LocalGameWorld] Map '{mapId}' not in config — waiting for raid...");
+                        }
                         Thread.Sleep(1000);
                         continue;
                     }
@@ -1407,6 +1417,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
                 // Fallback 2: scan nearby offsets in GameWorld for any recognisable map string.
                 // Range extended to 0x400 so we catch LocationId if its offset shifted in a patch.
+                List<string>? candidates = null;
                 for (uint off = 0x80; off <= 0x400; off += 8)
                 {
                     if (!Memory.TryReadPtr(gameWorld + off, out var p, false) || p == 0) continue;
@@ -1419,7 +1430,16 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                             $"[ReadMapID] fallback scan found '{s}' at gw+0x{off:X} (LocationId offset may have shifted)");
                         return s;
                     }
+                    // Collect unrecognized candidates to help identify new scene IDs (trader shops, cutscenes)
+                    candidates ??= new List<string>();
+                    if (!candidates.Contains(s))
+                        candidates.Add(s);
                 }
+
+                // Log unrecognized candidates — helps discover LocationIds for trader shops / cutscene scenes
+                if (candidates is { Count: > 0 })
+                    Log.WriteRateLimited(AppLogLevel.Info, "mapid_candidates", TimeSpan.FromSeconds(30),
+                        $"[ReadMapID] no known map at any offset — candidates: {string.Join(", ", candidates.Select(c => $"'{c}'"))}");
             }
             catch { }
 

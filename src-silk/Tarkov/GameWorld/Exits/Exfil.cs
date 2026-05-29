@@ -92,6 +92,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Exits
             // Read eligible entry points (PMC) or eligible IDs (Scav) — once only
             if (_eligibilityRead)
                 return;
+            _eligibilityRead = true; // set early so we don't retry on exception
 
             try
             {

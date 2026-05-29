@@ -239,7 +239,8 @@ namespace eft_dma_radar.Silk.Misc.Data.TarkovMarket
                 cancellationToken: cts.Token);
             response.EnsureSuccessStatusCode();
             return await JsonSerializer.DeserializeAsync<TarkovDevQuery>(
-                await response.Content.ReadAsStreamAsync(), _jsonOptions);
+                await response.Content.ReadAsStreamAsync(), _jsonOptions)
+                ?? throw new InvalidDataException("[TarkovDev] API returned null response body.");
         }
 
         // ── Response types ───────────────────────────────────────────────────

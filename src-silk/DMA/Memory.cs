@@ -275,12 +275,13 @@ namespace eft_dma_radar.Silk.DMA
 
                 // Run benchmark async — it takes 3s and would block the init thread.
                 // Fire-and-forget; DmaStats.MaxThroughputMBps will be populated shortly after.
-                Task.Run(() => RunThroughputBenchmark(_vmm));
+                Task.Run(() => RunThroughputBenchmark(_vmm!));
 
                 // Wider intervals reduce PCIe bus pressure competing with the
                 // 8ms RealtimeWorker scatter reads, reducing freeze risk in-raid.
-                _vmm.RegisterAutoRefresh(RefreshOption.MemoryPartial, TimeSpan.FromMilliseconds(500));
-                _vmm.RegisterAutoRefresh(RefreshOption.TlbPartial, TimeSpan.FromSeconds(3));
+                var vmm = VmmOrThrow();
+                vmm.RegisterAutoRefresh(RefreshOption.MemoryPartial, TimeSpan.FromMilliseconds(500));
+                vmm.RegisterAutoRefresh(RefreshOption.TlbPartial, TimeSpan.FromSeconds(3));
 
                 SetState(MemoryState.WaitingForProcess);
 

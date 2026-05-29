@@ -545,6 +545,9 @@ namespace eft_dma_radar.Silk.UI.ESP
 
                     if (Config.EspShowFps)
                         DrawFpsOverlay(canvas);
+
+                    if (Config.ShowKillFeed)
+                        DrawKillfeed(canvas, new SKSize(winSize.X, winSize.Y));
                 }
 
                 _grContext.Flush();
@@ -559,6 +562,78 @@ namespace eft_dma_radar.Silk.UI.ESP
         #endregion
 
         #region ESP Drawing
+
+        private static void DrawKillfeed(SKCanvas canvas, SKSize canvasSize)
+        {
+            KillfeedManager.PruneExpired();
+            var entries = KillfeedManager.Entries;
+
+            const float LineHeight  = 17f;
+            const float PadX        = 6f;
+            const float PadY        = 4f;
+            const float RightMargin = 8f;
+            const float TopMargin   = 8f;
+
+            float ttl = Config.KillFeedTtlSeconds;
+
+            const string EmptyText = "Killfeed — waiting for kills…";
+
+            float maxW = entries.Length == 0
+                ? SKPaints.FontKillfeed.MeasureText(EmptyText)
+                : 0f;
+            for (int i = 0; i < entries.Length; i++)
+            {
+                float w = SKPaints.FontKillfeed.MeasureText(entries[i].FormatDisplay());
+                if (w > maxW) maxW = w;
+            }
+
+            int lines = Math.Max(entries.Length, 1);
+            float panelW = maxW + PadX * 2f;
+            float panelH = lines * LineHeight + PadY * 2f;
+
+            // Default anchor: top-right corner (no drag in ESP window)
+            float panelX = canvasSize.Width - panelW - RightMargin;
+            float panelY = TopMargin;
+
+            canvas.DrawRect(panelX, panelY, panelW, panelH, SKPaints.KillfeedBackground);
+
+            if (entries.Length == 0)
+            {
+                float tx0 = panelX + PadX;
+                float ty0 = panelY + PadY + LineHeight - 3f;
+                canvas.DrawText(EmptyText, tx0 + 1, ty0 + 1, SKPaints.FontKillfeed, SKPaints.TextShadow);
+                var scratch0 = SKPaints.KillfeedTextScratch;
+                scratch0.Color = SKPaints.TextScav.Color.WithAlpha(180);
+                canvas.DrawText(EmptyText, tx0, ty0, SKPaints.FontKillfeed, scratch0);
+                return;
+            }
+
+            var scratch = SKPaints.KillfeedTextScratch;
+            for (int i = 0; i < entries.Length; i++)
+            {
+                var entry = entries[i];
+                float alpha = ttl > 0
+                    ? Math.Clamp(1f - (float)(entry.AgeSec / ttl), 0.15f, 1f)
+                    : 1f;
+
+                SKPaint textPaint = entry.KillerSide switch
+                {
+                    PlayerType.Teammate => SKPaints.TextTeammate,
+                    PlayerType.USEC     => SKPaints.TextUSEC,
+                    PlayerType.BEAR     => SKPaints.TextBEAR,
+                    PlayerType.PScav    => SKPaints.TextPScav,
+                    _                   => SKPaints.TextScav,
+                };
+
+                float tx = panelX + PadX;
+                float ty = panelY + PadY + LineHeight * i + LineHeight - 3f;
+                string display = entry.FormatDisplay();
+
+                canvas.DrawText(display, tx + 1, ty + 1, SKPaints.FontKillfeed, SKPaints.TextShadow);
+                scratch.Color = textPaint.Color.WithAlpha((byte)(alpha * 255f));
+                canvas.DrawText(display, tx, ty, SKPaints.FontKillfeed, scratch);
+            }
+        }
 
         private static void DrawEspEntities(SKCanvas canvas, Player localPlayer, RegisteredPlayers? allPlayers)
         {

@@ -55,13 +55,13 @@ namespace eft_dma_radar.Silk.UI.Panels
         private static void DrawToolbar()
         {
             bool showOverlay = Config.ShowKillFeed;
-            if (ImGui.Checkbox("Radar Overlay", ref showOverlay))
+            if (ImGui.Checkbox("ESP Window Overlay", ref showOverlay))
             {
                 Config.ShowKillFeed = showOverlay;
                 Config.MarkDirty();
             }
             if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Draw the killfeed overlay on the radar canvas.");
+                ImGui.SetTooltip("Draw the killfeed overlay on the ESP window.");
 
             ImGui.SameLine();
 

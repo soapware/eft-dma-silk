@@ -55,11 +55,6 @@ namespace eft_dma_radar.Silk.UI
         private static BtrTracker? _mouseOverBtr;
         private static BtrRouteStop? _mouseOverBtrStop;
 
-        // Killfeed overlay drag state
-        private static SKRect KillfeedBounds;
-        private static bool _killfeedDragging;
-        private static Vector2 _killfeedDragOffset;
-
         // Player counter overlay drag state
         private static SKRect PlayerCounterBounds;
         private static bool _playerCounterDragging;

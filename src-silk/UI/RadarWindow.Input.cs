@@ -26,16 +26,6 @@ namespace eft_dma_radar.Silk.UI
             float scenePx = pos.X / sScale;
             float scenePy = pos.Y / sScale;
 
-            // Killfeed overlay drag takes priority over map pan
-            if (button == MouseButton.Left && Config.ShowKillFeed
-                && KillfeedBounds.Width > 0 && KillfeedBounds.Contains(scenePx, scenePy))
-            {
-                _killfeedDragging = true;
-                _killfeedDragOffset = new Vector2(scenePx - KillfeedBounds.Left, scenePy - KillfeedBounds.Top);
-                _lastMousePosition = pos;
-                return;
-            }
-
             // Player counter overlay drag
             if (button == MouseButton.Left
                 && PlayerCounterBounds.Width > 0 && PlayerCounterBounds.Contains(scenePx, scenePy))
@@ -52,11 +42,6 @@ namespace eft_dma_radar.Silk.UI
 
         private static void OnMouseUp(IMouse mouse, MouseButton button)
         {
-            if (_killfeedDragging)
-            {
-                _killfeedDragging = false;
-                Config.Save();
-            }
             if (_playerCounterDragging)
             {
                 _playerCounterDragging = false;
@@ -67,15 +52,6 @@ namespace eft_dma_radar.Silk.UI
 
         private static void OnMouseMove(IMouse mouse, Vector2 position)
         {
-            if (_killfeedDragging)
-            {
-                var scale = UIScale;
-                Config.KillFeedPosX = (position.X / scale) - _killfeedDragOffset.X;
-                Config.KillFeedPosY = (position.Y / scale) - _killfeedDragOffset.Y;
-                _lastMousePosition = position;
-                return;
-            }
-
             if (_playerCounterDragging)
             {
                 var scale = UIScale;

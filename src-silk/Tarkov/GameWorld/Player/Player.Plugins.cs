@@ -74,5 +74,15 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
         public bool IsBtrOperator => Type == PlayerType.BtrOperator;
 
         #endregion
+
+        #region Bot Inventory
+
+        /// <summary>
+        /// Filtered backpack/pockets inventory for AI bots — only items that pass the loot filter.
+        /// Null = not yet scanned. Set by <see cref="Plugins.BotInventoryScanner"/>.
+        /// </summary>
+        internal List<LootItem>? BotInventory { get; set; }
+
+        #endregion
     }
 }

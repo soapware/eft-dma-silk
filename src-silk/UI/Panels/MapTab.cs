@@ -149,6 +149,13 @@ namespace eft_dma_radar.Silk.UI.Panels
                     Config.MarkDirty();
                 }
 
+                bool showContainerContents = Config.ShowContainerContents;
+                if (UIControls.ToggleRow("Scan Contents", ref showContainerContents, "Show items inside containers as loot on the radar.\nEach container is scanned once and cached — zero re-reads after first encounter."))
+                {
+                    Config.ShowContainerContents = showContainerContents;
+                    Config.MarkDirty();
+                }
+
                 ImGui.Spacing();
                 DrawContainerSelection();
                 ImGui.Unindent(16);

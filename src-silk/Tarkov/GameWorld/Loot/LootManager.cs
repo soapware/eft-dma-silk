@@ -77,6 +77,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         private readonly record struct ContainerCacheEntry(LootContainer Item, ulong InteractiveClass, ulong MainStoragePtr, Vector3 Position);
         private readonly Dictionary<ulong, ContainerCacheEntry> _containerCache = new();
 
+        // Container interior item cache: lootBase → resolved LootItems for that container.
+        // Populated once per container on first encounter, pruned when the container leaves the LootList.
+        private readonly Dictionary<ulong, List<LootItem>> _containerItemCache = new();
+
         // Slot names to skip when reading corpse equipment
         private static readonly FrozenSet<string> _skipSlots =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Compass", "ArmBand", "SecuredContainer" }
@@ -158,62 +162,52 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                 return;
             }
 
-            //// Extract items from container grids and add to loot list
-            //try
-            //{
-            //    Log.WriteLine($"[LootManager] Starting container grid extraction. Cache size: {_containerCache.Count}");
+            // Extract items from container interiors and merge into the loot list.
+            // Each container is scanned only once per raid (cached by lootBase); subsequent
+            // refreshes emit from the cache with zero DMA reads.
+            if (SilkProgram.Config.ShowContainerContents && _containerCache.Count > 0)
+            {
+                try
+                {
+                    var uncached = _containerCache
+                        .Where(x => !_containerItemCache.ContainsKey(x.Key)
+                                 && x.Value.MainStoragePtr.IsValidVirtualAddress())
+                        .Select(x => (x.Value.MainStoragePtr, x.Value.Position, x.Key))
+                        .ToList();
 
-            //    if (_containerCache.Count > 0)
-            //    {
-            //        var containerInfo = _containerCache
-            //            .Where(x => x.Value.MainStoragePtr.IsValidVirtualAddress())
-            //            .Select(x => (x.Value.MainStoragePtr, x.Value.Position, x.Key))
-            //            .ToList();
+                    if (uncached.Count > 0)
+                    {
+                        var pending = ExtractContainerGridItemsPending(uncached);
+                        if (pending.Count > 0)
+                        {
+                            var items = ResolveContainerItemsBatched(pending);
+                            foreach (var item in items)
+                            {
+                                if (item.LootBase != 0)
+                                {
+                                    if (!_containerItemCache.TryGetValue(item.LootBase, out var list))
+                                        _containerItemCache[item.LootBase] = list = new List<LootItem>();
+                                    list.Add(item);
+                                }
+                            }
+                        }
+                    }
 
-            //        Log.WriteLine($"[LootManager] Containers with valid MainStorage: {containerInfo.Count}");
-
-            //        if (containerInfo.Count > 0)
-            //        {
-            //            Log.WriteLine($"[LootManager] Extracting pending container items from {containerInfo.Count} containers...");
-            //            var pendingContainerItems = ExtractContainerGridItemsPending(containerInfo);
-            //            Log.WriteLine($"[LootManager] Extracted {pendingContainerItems.Count} pending container items");
-
-            //            if (pendingContainerItems.Count > 0)
-            //            {
-            //                Log.WriteLine($"[LootManager] Resolving {pendingContainerItems.Count} container items to LootItems...");
-            //                var containerItems = ResolveContainerItemsBatched(pendingContainerItems);
-            //                Log.WriteLine($"[LootManager] Resolved {containerItems.Count} container items");
-
-            //                if (containerItems.Count > 0)
-            //                {
-            //                    // Merge container items with loot items
-            //                    var merged = new List<LootItem>(lootResult.Count + containerItems.Count);
-            //                    merged.AddRange(lootResult);
-            //                    merged.AddRange(containerItems);
-            //                    _loot = merged;
-            //                    Log.WriteLine($"[LootManager] Merged container items. Total loot: {_loot.Count}");
-            //                }
-            //            }
-            //            else
-            //            {
-            //                Log.WriteLine($"[LootManager] No pending container items extracted");
-            //            }
-            //        }
-            //        else
-            //        {
-            //            Log.WriteLine($"[LootManager] No containers with valid MainStorage pointers");
-            //        }
-            //    }
-            //    else
-            //    {
-            //        Log.WriteLine($"[LootManager] Container cache is empty");
-            //    }
-            //}
-            //catch (Exception ex)
-            //{
-            //    Log.WriteRateLimited(AppLogLevel.Warning, "container_items_fail", TimeSpan.FromSeconds(5),
-            //        $"[LootManager] Container items extraction failed: {ex.Message}");
-            //}
+                    if (_containerItemCache.Count > 0)
+                    {
+                        var merged = new List<LootItem>(_loot.Count + _containerItemCache.Values.Sum(v => v.Count));
+                        merged.AddRange(_loot);
+                        foreach (var v in _containerItemCache.Values)
+                            merged.AddRange(v);
+                        _loot = merged;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.WriteRateLimited(AppLogLevel.Warning, "container_items_fail", TimeSpan.FromSeconds(5),
+                        $"[LootManager] Container items extraction failed: {ex.Message}");
+                }
+            }
 
             // Carry over previously-read gear/name data to new corpse objects
             var oldCorpses = _corpses;
@@ -331,6 +325,17 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                 if (stale is not null)
                     foreach (var k in stale)
                         _containerCache.Remove(k);
+            }
+
+            if (_containerItemCache.Count > 0)
+            {
+                List<ulong>? stale = null;
+                foreach (var k in _containerItemCache.Keys)
+                    if (!_containerCache.ContainsKey(k))
+                        (stale ??= new()).Add(k);
+                if (stale is not null)
+                    foreach (var k in stale)
+                        _containerItemCache.Remove(k);
             }
         }
 
@@ -1207,8 +1212,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                     if (!EftDataManager.AllItems.TryGetValue(bsgId, out var marketItem))
                         continue;
 
-                    // Use the container position for the item
-                    var item = new LootItem(marketItem, pending[i].ContainerPosition);
+                    var item = new LootItem(marketItem, pending[i].ContainerPosition)
+                    {
+                        LootBase = pending[i].LootBase
+                    };
                     item.RefreshImportance();
                     result.Add(item);
                 }

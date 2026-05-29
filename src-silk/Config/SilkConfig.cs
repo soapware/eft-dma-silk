@@ -721,6 +721,9 @@ namespace eft_dma_radar.Silk.Config
         /// <summary>Show container name labels next to container markers.</summary>
         public bool ShowContainerNames { get; set; } = true;
 
+        /// <summary>Scan container interiors and show their items as loot on the radar (cached per-container, zero re-reads after first scan).</summary>
+        public bool ShowContainerContents { get; set; } = true;
+
         /// <summary>Minimum price (roubles) below which loot is hidden from the radar.</summary>
         public int LootMinPrice { get; set; } = 50_000;
 
@@ -804,6 +807,14 @@ namespace eft_dma_radar.Silk.Config
 
         /// <summary>Show in-game wishlist items in the Other group (EWishlistGroup=4).</summary>
         public bool LootWishlistGroupOther { get; set; } = true;
+
+        // ── Bot Inventory Scanner ────────────────────────────────────────────────
+
+        /// <summary>Scan AI bot backpack/pockets for valuable loot and show in player mouseover tooltip.</summary>
+        public bool ScanBotInventory { get; set; } = false;
+
+        /// <summary>Max range (m) from local player within which bot inventories are scanned.</summary>
+        public int BotInventoryScanRange { get; set; } = 100;
 
         // ── Profiles ────────────────────────────────────────────────────────────
 

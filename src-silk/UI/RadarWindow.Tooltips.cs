@@ -153,6 +153,32 @@ namespace eft_dma_radar.Silk.UI
                     _tooltipLines.Add(($"  {kvp.Value.Short}{price}", SKPaints.TooltipText));
                 }
             }
+
+            // Bot inventory — AI only, requires ScanBotInventory and a completed scan
+            var botInv = player.BotInventory;
+            if (!player.IsHuman && botInv is { Count: > 0 })
+            {
+                _tooltipLines.Add(("── Inventory ──", SKPaints.TooltipLabel));
+                var filterData = LootFilter.FilterData;
+                int shown = 0;
+                foreach (var item in botInv)
+                {
+                    if (shown >= 15) break;
+                    bool wishlisted = filterData.IsWishlisted(item.Id);
+                    var paint = wishlisted ? SKPaints.TooltipWishlist
+                              : item.IsImportant ? SKPaints.TooltipAccent
+                              : SKPaints.TooltipText;
+                    string priceStr = item.DisplayPrice > 0 ? $" ({LootFilter.FormatPrice(item.DisplayPrice)})" : "";
+                    _tooltipLines.Add(($"  {item.ShortName}{priceStr}", paint));
+                    shown++;
+                }
+                if (botInv.Count > 15)
+                    _tooltipLines.Add(($"  ...+{botInv.Count - 15} more", SKPaints.TooltipLabel));
+            }
+            else if (!player.IsHuman && SilkProgram.Config.ScanBotInventory && player.BotInventory is null)
+            {
+                _tooltipLines.Add(("Scanning inventory...", SKPaints.TooltipLabel));
+            }
         }
 
         private static void BuildLootTooltipLines(LootItem loot, Player localPlayer)

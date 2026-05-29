@@ -234,6 +234,31 @@ namespace eft_dma_radar.Silk.UI.Panels
                 ImGui.Unindent(16);
             }
 
+            UIControls.Section("Bot Inventory Scanner");
+
+            bool scanBotInv = Config.ScanBotInventory;
+            if (UIControls.ToggleRow("Scan Bot Inventory", ref scanBotInv,
+                "Scan nearby AI bots' backpack and pockets for valuable loot.\n" +
+                "Results appear in the mouseover tooltip (important items and wishlisted only).\n" +
+                "Adds ~19 DMA rounds every 15 s. Off by default."))
+            {
+                Config.ScanBotInventory = scanBotInv;
+                Config.MarkDirty();
+            }
+
+            if (Config.ScanBotInventory)
+            {
+                ImGui.Indent(16);
+                int botRange = Config.BotInventoryScanRange;
+                if (UIControls.Stepper("Scan Range", ref botRange, 10, 500, 10, "{0}m",
+                    "Max distance from local player to scan bot inventories"))
+                {
+                    Config.BotInventoryScanRange = botRange;
+                    Config.MarkDirty();
+                }
+                ImGui.Unindent(16);
+            }
+
             UIControls.Section("Profile");
 
             bool profileLookups = Config.ProfileLookups;

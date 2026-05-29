@@ -122,7 +122,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
             DrawMarker(canvas, pos, fillPaint, chevronPaint, sin, cos);
 
             // Aimline — draw after marker so it extends outward
-            if (SilkProgram.Config.ShowAimlines && !IsLocalPlayer)
+            if (!IsLocalPlayer && (SilkProgram.Config.ShowAimlines
+                || (SilkProgram.Config.HighAlert && IsFacingLocalPlayer)))
                 DrawAimline(canvas, pos, aimlinePaint, sin, cos, localPlayer);
 
             if (!IsLocalPlayer)
@@ -224,7 +225,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Player
             // High Alert — extend aimline when hostile is facing local player.
             // Reuses the cached flag from HighAlertManager (updated every realtime tick)
             // so we don't redo the Distance + Normalize + Acos + Log math per frame.
-            if (config.HighAlert && IsHostile && IsFacingLocalPlayer)
+            if (config.HighAlert && IsFacingLocalPlayer)
             {
                 length = HighAlertLength;
             }

@@ -6,6 +6,7 @@ using eft_dma_radar.Silk.Misc.Workers;
 using eft_dma_radar.Silk.Tarkov.GameWorld.Btr;
 using eft_dma_radar.Silk.Tarkov.GameWorld.Explosives;
 using eft_dma_radar.Silk.Tarkov.GameWorld.Interactables;
+using eft_dma_radar.Silk.Tarkov.GameWorld.Player.Plugins;
 using eft_dma_radar.Silk.Tarkov.Unity;
 using eft_dma_radar.Silk.Tarkov.Unity.IL2CPP;
 using Switch = eft_dma_radar.Silk.Tarkov.GameWorld.Interactables.Switch;
@@ -67,6 +68,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         private WorkerThread? _explosivesWorker;
         private WorkerThread? _lootWorker;
         private readonly KeyInventoryScanner _keyScanner = new();
+        private readonly BotInventoryScanner _botScanner = new();
 
         // Deferred CameraManager retry state — used by the camera worker.
         // Uses a time budget with adaptive backoff rather than a fixed attempt cap,
@@ -870,6 +872,13 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 var doors = _interactablesManager.Doors;
                 if (doors.Count > 0)
                     _keyScanner.Update(_localPlayerAddr, doors);
+            }
+
+            // Bot inventory scan — rate-limited internally; off by default
+            if (_localPlayerAddr != 0 && SilkProgram.Config.ScanBotInventory
+                && _registeredPlayers.LocalPlayer is Player.LocalPlayer localPl)
+            {
+                _botScanner.Update(_registeredPlayers, localPl);
             }
 
             // Periodic transform validation

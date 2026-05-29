@@ -9,7 +9,7 @@ A modern DMA (Direct Memory Access) radar overlay for **Escape from Tarkov** (Un
 
 ---
 
-## What's Been Changed in this Fork
+## What's Changed in this Fork
 
 - **OBS-proof software cursor** — drawn in the ImGui foreground layer; stays visible when OBS game capture hides the hardware cursor. Toggle in Settings → General → Display.
 - **ESP loot category colors** — each loot label is colored by item category (Meds, Keys, Ammo, Food, Weapons, etc.) Toggle in Loot Filters → Options → ESP Category Colors.

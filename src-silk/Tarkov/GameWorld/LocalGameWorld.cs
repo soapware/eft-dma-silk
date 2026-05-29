@@ -330,11 +330,26 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     if (!mapId.Equals(HideoutMapID, StringComparison.OrdinalIgnoreCase)
                         && !MapManager.IsKnownMap(mapId))
                     {
-                        Memory.DiagnosticStatus = $"Unrecognized map ID '{mapId}'...";
-                        Log.WriteRateLimited(AppLogLevel.Info, "gw_unknown_map", TimeSpan.FromSeconds(10),
-                            $"[LocalGameWorld] Map '{mapId}' not in config — not a recognised raid. Waiting...");
-                        Thread.Sleep(1000);
-                        continue;
+                        // Reject obviously bad IDs ("unknown", too short/long, non-identifier chars).
+                        // Any ID that looks like a real EFT map name is accepted even if we don't
+                        // have a local SVG config — the structural checks above already validated
+                        // that this is a live raid. Rejecting unknown IDs permanently blocks
+                        // detection on new maps that haven't been added to our config yet.
+                        bool looksLikeMap = mapId.Length >= 3 && mapId.Length <= 48
+                            && mapId.All(c => char.IsLetterOrDigit(c) || c == '-' || c == '_')
+                            && !mapId.Equals("unknown", StringComparison.OrdinalIgnoreCase);
+
+                        if (!looksLikeMap)
+                        {
+                            Memory.DiagnosticStatus = $"Unrecognized map ID '{mapId}'...";
+                            Log.WriteRateLimited(AppLogLevel.Info, "gw_unknown_map", TimeSpan.FromSeconds(10),
+                                $"[LocalGameWorld] Map '{mapId}' not in config — not a recognised raid. Waiting...");
+                            Thread.Sleep(1000);
+                            continue;
+                        }
+
+                        Log.WriteRateLimited(AppLogLevel.Info, "gw_unknown_map_accept", TimeSpan.FromSeconds(30),
+                            $"[LocalGameWorld] Unknown map '{mapId}' accepted — structural checks passed. No local SVG config.");
                     }
 
                     // ── Phase 3: Accept — construct instance ────────────────────
@@ -1401,12 +1416,13 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     if (!string.IsNullOrEmpty(s)) return s;
                 }
 
-                // Fallback 2: scan nearby offsets in GameWorld for any recognisable map string
-                for (uint off = 0x80; off <= 0x200; off += 8)
+                // Fallback 2: scan nearby offsets in GameWorld for any recognisable map string.
+                // Range extended to 0x400 so we catch LocationId if its offset shifted in a patch.
+                for (uint off = 0x80; off <= 0x400; off += 8)
                 {
                     if (!Memory.TryReadPtr(gameWorld + off, out var p, false) || p == 0) continue;
                     var s = Memory.ReadUnityString(p, 32, false);
-                    if (string.IsNullOrEmpty(s) || s.Length < 3 || s.Length > 24) continue;
+                    if (string.IsNullOrEmpty(s) || s.Length < 3 || s.Length > 48) continue;
                     if (!s.All(c => char.IsLetterOrDigit(c) || c == '-' || c == '_')) continue;
                     if (MapManager.IsKnownMap(s) || s.Equals(HideoutMapID, StringComparison.OrdinalIgnoreCase))
                     {

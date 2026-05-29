@@ -1,0 +1,14 @@
+{
+	"mapID": ["Icebreaker"],
+	"x": 640,
+	"y": 360,
+	"scale": 1.0,
+	"svgScale": 1.0,
+	"mapLayers": [
+		{
+			"minHeight": null,
+			"maxHeight": null,
+			"filename": "default.svg"
+		}
+	]
+}

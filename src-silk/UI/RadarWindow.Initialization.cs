@@ -192,8 +192,9 @@ namespace eft_dma_radar.Silk.UI
                 // Defer fullscreen restore to first render frame so _window.Position is valid
                 _needRestoreFullscreen = Config.RadarFullscreen;
 
-                // Auto-open the hideout panel
+                // Auto-open the hideout panel; auto-close when a raid begins
                 Memory.HideoutEntered += static (_, _) => HideoutPanel.IsOpen = true;
+                Memory.RaidStarted    += static (_, _) => HideoutPanel.IsOpen = false;
 
                 // Wire up the notification callback into the silk Memory module
                 Memory.ShowNotification ??= static (msg, level) =>

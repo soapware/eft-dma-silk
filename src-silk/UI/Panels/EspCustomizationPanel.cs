@@ -39,11 +39,21 @@ namespace eft_dma_radar.Silk.UI.Panels
 
             if (ImGui.BeginTabBar("##espvis-tabs"))
             {
-                if (ImGui.BeginTabItem("Players"))    { DrawPlayersTab();    ImGui.EndTabItem(); }
-                if (ImGui.BeginTabItem("Box"))        { DrawBoxTab();        ImGui.EndTabItem(); }
-                if (ImGui.BeginTabItem("Indicators")) { DrawIndicatorsTab(); ImGui.EndTabItem(); }
-                if (ImGui.BeginTabItem("Window"))     { DrawWindowTab();     ImGui.EndTabItem(); }
-                ImGui.EndTabBar();
+                try
+                {
+                    if (ImGui.BeginTabItem("Players"))
+                        { try { DrawPlayersTab();    } finally { ImGui.EndTabItem(); } }
+                    if (ImGui.BeginTabItem("Box"))
+                        { try { DrawBoxTab();        } finally { ImGui.EndTabItem(); } }
+                    if (ImGui.BeginTabItem("Indicators"))
+                        { try { DrawIndicatorsTab(); } finally { ImGui.EndTabItem(); } }
+                    if (ImGui.BeginTabItem("Window"))
+                        { try { DrawWindowTab();     } finally { ImGui.EndTabItem(); } }
+                }
+                finally
+                {
+                    ImGui.EndTabBar();
+                }
             }
         }
 

@@ -48,6 +48,27 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
             IsAntialias = true,
         };
 
+        // Render-thread-only reusable path for height-direction arrow triangles.
+        private static readonly SKPath _arrowPath = new();
+
+        private static void BuildArrowPath(SKPath path, SKPoint p, float size, bool up)
+        {
+            path.Reset();
+            if (up)
+            {
+                path.MoveTo(p.X, p.Y - size);
+                path.LineTo(p.X - size, p.Y + size * 0.8f);
+                path.LineTo(p.X + size, p.Y + size * 0.8f);
+            }
+            else
+            {
+                path.MoveTo(p.X, p.Y + size);
+                path.LineTo(p.X - size, p.Y - size * 0.8f);
+                path.LineTo(p.X + size, p.Y - size * 0.8f);
+            }
+            path.Close();
+        }
+
         public LootContainer(string bsgId, string name, Vector3 position, bool searched)
         {
             Id = bsgId;
@@ -58,24 +79,46 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
 
         /// <summary>
         /// Draw this container on the radar canvas as a small square marker with name label.
+        /// When <paramref name="heightDelta"/> exceeds the configured threshold and height arrows
+        /// are enabled, the square is replaced with an up/down triangle matching loot-item arrows.
         /// </summary>
-        public void Draw(SKCanvas canvas, SKPoint screenPos, bool showName)
+        public void Draw(SKCanvas canvas, SKPoint screenPos, bool showName, float heightDelta = 0f)
         {
-            const float halfSize = 3.5f;
+            var cfg = SilkProgram.Config;
+            int heightDir = 0;
+            if (cfg.LootShowHeightArrows)
+            {
+                float thr = Math.Max(0.3f, cfg.LootHeightArrowThreshold);
+                if (heightDelta > thr) heightDir = 1;
+                else if (heightDelta < -thr) heightDir = -1;
+            }
 
-            // Draw square marker (outline then fill)
-            var rect = new SKRect(
-                screenPos.X - halfSize, screenPos.Y - halfSize,
-                screenPos.X + halfSize, screenPos.Y + halfSize);
-            canvas.DrawRect(rect, _markerOutline);
-            canvas.DrawRect(rect, _markerStroke);
+            const float halfSize = 3.5f;
+            if (heightDir != 0)
+            {
+                BuildArrowPath(_arrowPath, screenPos, halfSize + 1.5f, heightDir > 0);
+                canvas.DrawPath(_arrowPath, _markerOutline);
+                canvas.DrawPath(_arrowPath, _markerStroke);
+            }
+            else
+            {
+                var rect = new SKRect(
+                    screenPos.X - halfSize, screenPos.Y - halfSize,
+                    screenPos.X + halfSize, screenPos.Y + halfSize);
+                canvas.DrawRect(rect, _markerOutline);
+                canvas.DrawRect(rect, _markerStroke);
+            }
 
             if (showName)
             {
+                string heightTxt = (heightDir != 0 && cfg.LootShowHeightDelta)
+                    ? $" {(heightDelta >= 0 ? "+" : "")}{(int)MathF.Round(heightDelta)}m"
+                    : "";
+                string label = Name + heightTxt;
                 float lx = screenPos.X + 7f;
                 float ly = screenPos.Y + 4.5f;
-                canvas.DrawText(Name, lx + 1f, ly + 1f, SKPaints.FontRegular11, SKPaints.LootShadow);
-                canvas.DrawText(Name, lx, ly, SKPaints.FontRegular11, SKPaints.TextContainer);
+                canvas.DrawText(label, lx + 1f, ly + 1f, SKPaints.FontRegular11, SKPaints.LootShadow);
+                canvas.DrawText(label, lx, ly, SKPaints.FontRegular11, SKPaints.TextContainer);
             }
         }
     }

@@ -1099,8 +1099,9 @@ namespace eft_dma_radar.Silk.UI.ESP
         {
             var size = _window!.Size;
             float textWidth = SKPaints.FontBanner.MeasureText(text);
-            float x = (size.X - textWidth) / 2f;
-            float y = size.Y / 2f;
+            const float margin = 15f;
+            float x = size.X - textWidth - margin;
+            float y = margin + 22f;
             canvas.DrawText(text, x, y, SKPaints.FontBanner, SKPaints.TextRadarStatus);
         }
 

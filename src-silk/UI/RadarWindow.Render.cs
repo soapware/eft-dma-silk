@@ -268,7 +268,8 @@ namespace eft_dma_radar.Silk.UI
                         if (!selectedIds.Contains(container.Id))
                             continue;
                         var sp = mapParams.ToScreenPos(MapParams.ToMapPos(container.Position, mapCfg));
-                        container.Draw(canvas, sp, showNames);
+                        float dy = container.Position.Y - playerY;
+                        container.Draw(canvas, sp, showNames, dy);
                     }
                 }
             }

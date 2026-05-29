@@ -140,9 +140,10 @@ namespace eft_dma_radar.Silk.UI.Maps
         }
 
         /// <summary>
-        /// Returns <c>true</c> if the given map ID is a known/valid map in our config set.
-        /// Used by <see cref="LocalGameWorld.Create"/> to reject menu/narrate GameWorlds
-        /// that have no real LocationId.
+        /// Returns <c>true</c> if the given map ID has a bundled config in the Maps directory.
+        /// Used to detect brand-new maps that we'll be rendering with the default fallback
+        /// so we can surface a warning to the user. Not used to reject raids — unknown
+        /// maps are still accepted and rendered against the default background.
         /// </summary>
         internal static bool IsKnownMap(string mapId)
         {

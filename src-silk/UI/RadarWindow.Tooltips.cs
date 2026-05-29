@@ -227,12 +227,14 @@ namespace eft_dma_radar.Silk.UI
 
             _tooltipLines.Add((corpse.Name, SKPaints.TextCorpse));
 
-            if (corpse.TotalValue > 0)
+            var cfg = SilkProgram.Config;
+
+            if (cfg.ShowCorpseValue && corpse.TotalValue > 0)
                 _tooltipLines.Add(($"Value: {LootFilter.FormatPrice(corpse.TotalValue)}", SKPaints.TooltipAccent));
 
             _tooltipLines.Add(($"Distance: {dist}m", SKPaints.TooltipLabel));
 
-            if (corpse.GearReady && corpse.Equipment.Count > 0)
+            if (cfg.ShowCorpseInventory && corpse.GearReady && corpse.Equipment.Count > 0)
             {
                 foreach (var kvp in corpse.Equipment)
                 {

@@ -318,6 +318,14 @@ namespace eft_dma_radar.Silk.UI.Panels
                 Config.LootShowWishlist = showWL;
                 Config.MarkDirty();
             }
+
+            bool showUnk = Config.LootShowUnknownItems;
+            if (UIControls.ToggleRow("\u2754  Unknown Items", ref showUnk,
+                "Show loose items whose BSG ID isn't in the tarkov.dev database\n(e.g. items added by a recent patch). Rendered with a placeholder label\nshowing the BSG ID prefix so they can be identified and reported."))
+            {
+                Config.LootShowUnknownItems = showUnk;
+                Config.MarkDirty();
+            }
         }
 
         // ── Quest Loot Highlighting ───────────────────────────────────────────
@@ -734,6 +742,32 @@ namespace eft_dma_radar.Silk.UI.Panels
                 Config.ShowCorpses = showCorpses;
                 Config.MarkDirty();
             }
+
+            if (!Config.ShowCorpses)
+                ImGui.BeginDisabled();
+
+            ImGui.Indent(16);
+
+            bool showCorpseValue = Config.ShowCorpseValue;
+            if (UIControls.ToggleRow("Show Corpse Value", ref showCorpseValue,
+                "Show total gear value on the corpse tooltip and aimview label."))
+            {
+                Config.ShowCorpseValue = showCorpseValue;
+                Config.MarkDirty();
+            }
+
+            bool showCorpseInv = Config.ShowCorpseInventory;
+            if (UIControls.ToggleRow("Show Corpse Inventory", ref showCorpseInv,
+                "Show the per-slot equipment list on the corpse tooltip."))
+            {
+                Config.ShowCorpseInventory = showCorpseInv;
+                Config.MarkDirty();
+            }
+
+            ImGui.Unindent(16);
+
+            if (!Config.ShowCorpses)
+                ImGui.EndDisabled();
         }
 
         // ── Footer ───────────────────────────────────────────────────────────

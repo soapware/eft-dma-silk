@@ -900,7 +900,7 @@ namespace eft_dma_radar.Silk.DMA
         {
             if (count == 0) return;
             using var scatter = new VmmScatter(VmmOrThrow(), _pid, ToFlags(useCache));
-            scatter.Executed += count => DmaStats.AddScatterExecute(count);
+            scatter.Executed += (count, pages) => DmaStats.AddScatterExecute(count, pages);
 
             for (int i = 0; i < count; i++)
             {
@@ -1198,8 +1198,8 @@ namespace eft_dma_radar.Silk.DMA
         // Scatter handles are created and disposed many times per worker tick
         // (realtime, validation, gear, hands, firearm, etc.), so even a small
         // managed allocation here adds up to measurable GC pressure over a raid.
-        private static readonly Action<int> s_scatterExecutedHandler =
-            static count => DmaStats.AddScatterExecute(count);
+        private static readonly Action<int, int> s_scatterExecutedHandler =
+            static (count, pages) => DmaStats.AddScatterExecute(count, pages);
 
         /// <summary>Signals the worker to stop, waits for it to exit, and disposes the VMM handle.</summary>
         public static void Close()

@@ -209,25 +209,31 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                 }
             }
 
-            // Carry over previously-read gear/name data to new corpse objects
+            // Carry over previously-read name + gear data to new corpse objects.
+            // The corpse list is rebuilt every loot refresh, but equipment re-reads are
+            // throttled (CorpseGearRefreshSeconds) — without this carry-over, gear/value
+            // would disappear between throttled reads, leaving the tooltip blank.
             var oldCorpses = _corpses;
             if (oldCorpses.Count > 0 && corpseResult.Count > 0)
             {
-                // Carry over only the resolved display name — equipment is always re-read fresh
-                // so looted/removed items are reflected every refresh cycle.
-                Dictionary<ulong, string>? oldNames = null;
+                Dictionary<ulong, LootCorpse>? oldByIc = null;
                 foreach (var oc in oldCorpses)
-                {
-                    if (oc.Name != "Corpse")
-                        (oldNames ??= new(oldCorpses.Count))[oc.InteractiveClass] = oc.Name;
-                }
+                    (oldByIc ??= new(oldCorpses.Count))[oc.InteractiveClass] = oc;
 
-                if (oldNames is not null)
+                if (oldByIc is not null)
                 {
                     foreach (var nc in corpseResult)
                     {
-                        if (oldNames.TryGetValue(nc.InteractiveClass, out var name))
-                            nc.Name = name;
+                        if (!oldByIc.TryGetValue(nc.InteractiveClass, out var oc))
+                            continue;
+                        if (oc.Name != "Corpse")
+                            nc.Name = oc.Name;
+                        if (oc.GearReady)
+                        {
+                            nc.Equipment = oc.Equipment;
+                            nc.TotalValue = oc.TotalValue;
+                            nc.GearReady = true;
+                        }
                     }
                 }
             }
@@ -594,7 +600,9 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                     foreach (var item in resolved)
                     {
                         lootResult.Add(item);
-                        if (item.LootBase != 0)
+                        // Skip caching unknowns so a later devdata refresh can resolve them
+                        // to real market entries on the next loot refresh.
+                        if (item.LootBase != 0 && !item.IsUnknownItem)
                             _lootItemCache[item.LootBase] = item;
                     }
                 }
@@ -1023,31 +1031,6 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                         if (bsgId.Length == 0)
                             continue;
 
-                        bool isQuestItem = pending[i].IsQuestItem;
-                        TarkovMarketItem? marketItem;
-                        if (!EftDataManager.AllItems.TryGetValue(bsgId, out marketItem))
-                        {
-                            if (!isQuestItem)
-                                continue;
-
-                            // Quest items are typically absent from the market DB. Synthesize a
-                            // minimal TarkovMarketItem from the short name we already scattered.
-                            var rawShort = shortNames[i];
-                            string shortName = "Quest Item";
-                            if (!string.IsNullOrEmpty(rawShort))
-                            {
-                                int snt = rawShort.IndexOf('\0');
-                                var s = snt >= 0 ? rawShort[..snt] : rawShort;
-                                if (s.Length > 0) shortName = s;
-                            }
-                            marketItem = new TarkovMarketItem
-                            {
-                                BsgId = bsgId,
-                                Name = shortName,
-                                ShortName = $"Q_{shortName}",
-                            };
-                        }
-
                         if (!verticesPtrs[i].IsValidVirtualAddress() || !indicesPtrs[i].IsValidVirtualAddress())
                             continue;
 
@@ -1066,9 +1049,58 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                             if (pos == Vector3.Zero)
                                 continue;
 
+                            bool isQuestItem = pending[i].IsQuestItem;
+                            bool isUnknownItem = false;
+                            TarkovMarketItem? marketItem;
+                            if (!EftDataManager.AllItems.TryGetValue(bsgId, out marketItem))
+                            {
+                                if (!isQuestItem)
+                                {
+                                    // Surface unknown BSG IDs (e.g. items added by a patch but not
+                                    // yet in tarkov.dev) so users can report them. Rate-limited per
+                                    // BSG ID to avoid spam when the same unknown item is on screen.
+                                    Log.WriteRateLimited(AppLogLevel.Info, $"loot_unknown_{bsgId}", TimeSpan.FromSeconds(60),
+                                        $"[LootManager] Unknown BSG ID '{bsgId}' not in devdata | Pos: ({pos.X:F2}, {pos.Y:F2}, {pos.Z:F2}) | LootBase: 0x{pending[i].LootBase:X16}");
+
+                                    // Only render unknowns when the user has opted in — they have no
+                                    // category, price, or display name, so they'd otherwise be radar noise.
+                                    if (!SilkProgram.Config.LootShowUnknownItems)
+                                        continue;
+
+                                    isUnknownItem = true;
+                                    string shortPrefix = bsgId.Length > 8 ? bsgId[..8] : bsgId;
+                                    marketItem = new TarkovMarketItem
+                                    {
+                                        BsgId = bsgId,
+                                        Name = $"Unknown {bsgId}",
+                                        ShortName = $"?{shortPrefix}",
+                                    };
+                                }
+                                else
+                                {
+                                    // Quest items are typically absent from the market DB. Synthesize a
+                                    // minimal TarkovMarketItem from the short name we already scattered.
+                                    var rawShort = shortNames[i];
+                                    string shortName = "Quest Item";
+                                    if (!string.IsNullOrEmpty(rawShort))
+                                    {
+                                        int snt = rawShort.IndexOf('\0');
+                                        var s = snt >= 0 ? rawShort[..snt] : rawShort;
+                                        if (s.Length > 0) shortName = s;
+                                    }
+                                    marketItem = new TarkovMarketItem
+                                    {
+                                        BsgId = bsgId,
+                                        Name = shortName,
+                                        ShortName = $"Q_{shortName}",
+                                    };
+                                }
+                            }
+
                             var item = new LootItem(marketItem, pos)
                             {
                                 IsQuestItem = isQuestItem,
+                                IsUnknownItem = isUnknownItem,
                                 LootBase = pending[i].LootBase,
                             };
                             item.RefreshImportance();

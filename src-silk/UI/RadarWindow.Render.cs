@@ -152,6 +152,7 @@ namespace eft_dma_radar.Silk.UI
 
         private static void DrawRadar(SKCanvas canvas, Player localPlayer, IRadarMap map, float scale)
         {
+            LootFilter.AdvanceFrame();
             var localPlayerPos    = localPlayer.Position;
             var localPlayerMapPos = MapParams.ToMapPos(localPlayerPos, map.Config);
 

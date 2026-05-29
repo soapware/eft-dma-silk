@@ -40,6 +40,14 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         /// <summary>Total items evaluated on the last frame.</summary>
         public static int TotalCount { get; private set; }
 
+        // ── Per-frame result cache ─────────────────────────────────────────────
+        // Incremented once per render frame so LootItem can cache its FilterResult
+        // and skip re-evaluation when the same item is visited by the canvas render,
+        // LootWidget, AimviewWidget, and ESP all within the same frame.
+        private static int _frameId;
+        internal static int FrameId => _frameId;
+        internal static void AdvanceFrame() => ++_frameId;
+
         // ── Persistent filter data (wishlist / blacklist) ────────────────────
 
         private static LootFilterData _filterData = new();
@@ -374,6 +382,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
             config.LootShowKeys = false;
             config.LootShowWishlist = true;
             config.LootShowQuestItems = true;
+            config.LootShowUnknownItems = false;
             config.LootImportantOnly = false;
             ClearSearch();
         }

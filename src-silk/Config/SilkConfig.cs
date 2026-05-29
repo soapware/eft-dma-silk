@@ -715,6 +715,12 @@ namespace eft_dma_radar.Silk.Config
         public bool ShowLoot { get; set; } = true;        /// <summary>Show corpse X markers on the radar (when loot is enabled).</summary>
         public bool ShowCorpses { get; set; } = true;
 
+        /// <summary>Show total gear value on corpse tooltip and aimview label.</summary>
+        public bool ShowCorpseValue { get; set; } = true;
+
+        /// <summary>Show per-slot equipment list on corpse tooltip.</summary>
+        public bool ShowCorpseInventory { get; set; } = true;
+
         /// <summary>Show static loot containers on the radar (when loot is enabled).</summary>
         public bool ShowContainers { get; set; } = true;
 
@@ -782,6 +788,14 @@ namespace eft_dma_radar.Silk.Config
         /// Independent of <see cref="ShowQuests"/> which controls active-quest highlighting.
         /// </summary>
         public bool LootShowQuestItems { get; set; } = true;
+
+        /// <summary>
+        /// Show loose items whose BSG ID is not present in the tarkov.dev database
+        /// (e.g. items added by a recent patch that aren't catalogued yet). When enabled,
+        /// these render with a placeholder name showing the BSG ID prefix so they can be
+        /// identified in the field. Off by default to avoid radar clutter.
+        /// </summary>
+        public bool LootShowUnknownItems { get; set; } = false;
 
         /// <summary>
         /// Quick filter: when enabled, only Important (tier ≥ 1), wishlisted,

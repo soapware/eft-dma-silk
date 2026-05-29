@@ -21,6 +21,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using VmmSharpEx.Extensions;
 using VmmSharpEx.Internal;
 using VmmSharpEx.Options;
 
@@ -40,6 +41,12 @@ public sealed class VmmScatter : IDisposable
     private VmmFlags _flags;
     private bool _disposed;
     private int _prepareCount;
+    // Set of 4 KB page base addresses touched by all PrepareRead calls in this batch.
+    // The scatter API consolidates per-page — multiple PrepareReads on the same page
+    // only cost one physical fetch — so MB/s must reflect *unique* pages, not the sum
+    // of spans across all prepares (which would double-count when many small reads
+    // hit the same object/page). Cleared after each Execute.
+    private readonly HashSet<ulong> _pageSet = new(128);
 
     /// <summary>
     /// Event is fired upon completion of <see cref="Execute"/>. Exceptions are handled/ignored.
@@ -149,7 +156,15 @@ public sealed class VmmScatter : IDisposable
         // native scatter handle is not safe for concurrent Prepare/Execute);
         // a plain increment avoids a locked op on the realtime hot path.
         if (result)
+        {
             _prepareCount++;
+            // Add every 4 KB page this read touches to the set (dedupes across prepares).
+            // A 64 KB array spans 16 pages; an 8-byte read across a page boundary spans 2.
+            ulong basePage = address & ~0xFFFul;
+            ulong endPage = (address + cb - 1) & ~0xFFFul;
+            for (ulong p = basePage; p <= endPage; p += 0x1000ul)
+                _pageSet.Add(p);
+        }
         return result;
     }
 
@@ -252,23 +267,19 @@ public sealed class VmmScatter : IDisposable
         if (!Vmmi.VMMDLL_Scatter_Execute(_handle))
             throw new VmmException("Scatter Operation Failed");
         var executed = Executed;
-        if (executed is not null)
-        {
-            int n = _prepareCount;
-            _prepareCount = 0;
-            executed.Invoke(n);
-        }
-        else
-        {
-            _prepareCount = 0;
-        }
+        int n = _prepareCount;
+        int pages = _pageSet.Count;
+        _prepareCount = 0;
+        _pageSet.Clear();
+        executed?.Invoke(n, pages);
         OnCompleted();
     }
 
     /// <summary>
-    /// Raised after a successful <see cref="Execute"/>, carrying the number of prepared reads that were dispatched.
+    /// Raised after a successful <see cref="Execute"/>, carrying the number of prepared reads that were dispatched
+    /// and the total 4 KB pages actually touched on the DMA bus (always &gt;= prepareCount).
     /// </summary>
-    public event Action<int>? Executed;
+    public event Action<int, int>? Executed;
 
     /// <summary>
     /// Read memory from an address into a byte array.

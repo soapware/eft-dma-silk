@@ -20,6 +20,12 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         /// </summary>
         public bool IsQuestItem { get; init; }
 
+        /// <summary>
+        /// True when the item's BSG ID isn't in the tarkov.dev database. Visibility is
+        /// controlled by <see cref="SilkConfig.LootShowUnknownItems"/>.
+        /// </summary>
+        public bool IsUnknownItem { get; init; }
+
         // Cached label to avoid per-frame string allocation
         private string? _cachedLabel;
         private int _cachedLabelKey = int.MinValue;
@@ -29,6 +35,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         private uint _cachedStateVersion = 0;
         private int _cachedDisplayPrice = -1;
         private bool _cachedImportant;
+
+        // Per-frame filter result cache — avoids re-running Evaluate() when canvas
+        // render, LootWidget, AimviewWidget, and ESP all visit the same item in one frame.
+        private int _cachedFrameId = -1;
+        private LootFilter.FilterResult _cachedFrameResult;
 
         public string Id { get; } = item.BsgId;
         public string Name => _item.Name;
@@ -55,29 +66,35 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                 {
                     _cachedDisplayPrice = LootFilter.GetDisplayPrice(_item);
                     _cachedStateVersion = stateVer;
-                    _cachedResult = EvaluateInternal(_cachedDisplayPrice);
+                    _cachedResult = EvaluateCore(_cachedDisplayPrice);
                     _cachedImportant = LootFilter.IsImportant(_cachedDisplayPrice);
                 }
                 return _cachedDisplayPrice;
             }
         }
 
-        /// <summary>Full filter evaluation — visibility, importance, wishlist, category.</summary>
+        /// <summary>Full filter evaluation — visibility, importance, wishlist, category. Result is cached per render frame.</summary>
         public LootFilter.FilterResult Evaluate(int displayPrice)
         {
-            uint stateVer = LootFilter.GetStateVersion();
-            if (_cachedStateVersion != stateVer || _cachedDisplayPrice == -1)
-            {
-                _cachedStateVersion = stateVer;
-                _cachedDisplayPrice = displayPrice;
-                _cachedResult = EvaluateInternal(displayPrice);
-                _cachedImportant = LootFilter.IsImportant(displayPrice);
-            }
-            return _cachedResult;
+            int fid = LootFilter.FrameId;
+            if (_cachedFrameId == fid)
+                return _cachedFrameResult;
+            _cachedFrameId = fid;
+            _cachedFrameResult = EvaluateCore(displayPrice);
+            return _cachedFrameResult;
         }
 
-        private LootFilter.FilterResult EvaluateInternal(int displayPrice)
+        private LootFilter.FilterResult EvaluateCore(int displayPrice)
         {
+            if (IsUnknownItem)
+            {
+                if (!SilkProgram.Config.LootShowUnknownItems)
+                    return LootFilter.FilterResult.Hidden;
+
+                return new LootFilter.FilterResult { Visible = true };
+            }
+
+
             if (IsQuestItem)
             {
                 var config = SilkProgram.Config;

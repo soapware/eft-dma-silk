@@ -102,21 +102,26 @@ namespace eft_dma_radar.Silk.DMA
         /// <summary>
         /// Called once per scatter.Execute() from any thread.
         /// <paramref name="prepareCount"/> is the number of PrepareRead entries that were batched into this trip.
-        /// Each PrepareRead entry maps to at least one 4 KB physical DMA page.
+        /// <paramref name="pageCount"/> is the total number of 4 KB pages actually touched on the DMA bus
+        /// (accounts for reads spanning a page boundary and array reads larger than one page).
         /// Byte accounting is done here (not in RecordTick) so ALL scatter workers contribute to the MB/s display.
         /// </summary>
-        public static void AddScatterExecute(int prepareCount)
+        public static void AddScatterExecute(int prepareCount, int pageCount)
         {
             Interlocked.Increment(ref _executesAccum);
             Interlocked.Add(ref _preparedAccum, prepareCount);
-            // Each PrepareRead resolves to at least one 4 KB hardware page on the DMA bus.
-            // Accumulating here captures realtime, gear, camera, skeleton, and loot workers.
-            Interlocked.Add(ref _bytesAccum, (long)prepareCount * 4096L);
+            // Real bus cost = pages touched × 4 KB. Previously approximated as prepareCount × 4 KB,
+            // which over-counted tiny reads and severely under-counted multi-page array reads.
+            Interlocked.Add(ref _bytesAccum, (long)pageCount * 4096L);
         }
 
         /// <summary>
         /// Called once per direct Memory.ReadValue / ReadPtr / ReadBuffer / ReadString call.
-        /// Each of these is one unbatched hardware bus round-trip.
+        /// Tracked as a count for the DirectReadsPerSecond counter. NOT added to the MB/s
+        /// accumulator: direct reads with the page cache enabled (the default) are often
+        /// served from VMM's in-process cache without hitting the PCIe bus, so counting
+        /// their nominal size would inflate MB/s above the hardware ceiling.
+        /// MB/s reflects scatter bus utilization only — which dominates the hot path.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void AddDirectRead()

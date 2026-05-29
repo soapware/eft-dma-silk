@@ -405,7 +405,7 @@ namespace eft_dma_radar.Silk.UI.Widgets
                 if (!TryProjectCtx(worldPos, eyePos, ref ctx, out float sx, out float sy))
                     continue;
 
-                string label = corpse.TotalValue > 0
+                string label = cfg.ShowCorpseValue && corpse.TotalValue > 0
                     ? $"{corpse.Name} ({LootFilter.FormatPrice(corpse.TotalValue)})"
                     : corpse.Name;
 

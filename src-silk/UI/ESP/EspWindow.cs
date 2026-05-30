@@ -1,4 +1,4 @@
-// Copyright (c) 2025 HuiTeab.
+﻿// Copyright (c) 2025 HuiTeab.
 // Licensed under the PolyForm Noncommercial License 1.0.0.
 // See LICENSE in the repository root for details.
 
@@ -514,7 +514,7 @@ namespace eft_dma_radar.Silk.UI.ESP
 
                 if (!Memory.InRaid || localPlayer is null || !CameraManager.IsActive)
                 {
-                    DrawCenteredText(canvas, "Waiting for Raid...");
+                    DrawCenteredText(canvas, "Waiting for Raid   ");
                 }
                 else
                 {

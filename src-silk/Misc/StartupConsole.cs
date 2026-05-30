@@ -322,7 +322,9 @@ namespace eft_dma_radar.Silk.Misc
         }
 
         /// <summary>
-        /// Writes the full tip box at the current cursor position.
+        /// Writes the full tip box using explicit cursor positioning per row.
+        /// Uses SetCursorPosition + Write (never WriteLine) so the cursor never
+        /// auto-advances past the last row — prevents buffer-scroll position drift.
         /// 9 rows total: ┌ + blank + TipLines content + blank + └
         /// </summary>
         private static void RenderTipBox()
@@ -330,9 +332,16 @@ namespace eft_dma_radar.Silk.Misc
             string emptyInner = new string(' ', BoxIW);
             string bottomRule = new string('─', BoxIW);
 
-            Console.ForegroundColor = ConsoleColor.DarkGray;
-            Console.WriteLine($"  ┌─ STATUS {new string('─', BoxIW - 9)}┐");
-            Console.WriteLine($"  │{emptyInner}│");
+            void Row(int offset, ConsoleColor color, string content)
+            {
+                Console.SetCursorPosition(0, _tipRow + offset);
+                Console.ForegroundColor = color;
+                Console.Write(content);
+                Console.Write("\x1b[K");
+            }
+
+            Row(0, ConsoleColor.DarkGray, $"  ┌─ STATUS {new string('─', BoxIW - 9)}┐");
+            Row(1, ConsoleColor.DarkGray, $"  │{emptyInner}│");
 
             for (int i = 0; i < TipLines; i++)
             {
@@ -341,17 +350,17 @@ namespace eft_dma_radar.Silk.Misc
                 if (line.Length > max) line = line[..max];
                 line = line.PadRight(max);
 
+                Console.SetCursorPosition(0, _tipRow + 2 + i);
                 Console.ForegroundColor = ConsoleColor.DarkGray;
                 Console.Write("  │  ");
                 Console.ForegroundColor = (i == 0 && _tip.Length > 0) ? ConsoleColor.White : ConsoleColor.DarkGray;
                 Console.Write(line);
                 Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.WriteLine("  │");
+                Console.Write("  │\x1b[K");
             }
 
-            Console.ForegroundColor = ConsoleColor.DarkGray;
-            Console.WriteLine($"  │{emptyInner}│");
-            Console.WriteLine($"  └{bottomRule}┘");
+            Row(TipLines + 2, ConsoleColor.DarkGray, $"  │{emptyInner}│");
+            Row(TipLines + 3, ConsoleColor.DarkGray, $"  └{bottomRule}┘");
             Console.ResetColor();
         }
 

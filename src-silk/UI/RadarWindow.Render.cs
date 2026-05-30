@@ -285,7 +285,7 @@ namespace eft_dma_radar.Silk.UI
                     {
                         if (!worldBounds.Contains(exfil.Position))
                             continue;
-                        if (Config.HideInactiveExfils && lp is not null && !exfil.IsAvailableFor(lp))
+                        if (Config.HideInactiveExfils && lp is not null && !exfil.IsEligibleFor(lp))
                             continue;
                         var sp = mapParams.ToScreenPos(MapParams.ToMapPos(exfil.Position, mapCfg));
                         exfil.Draw(canvas, sp, localPlayer);

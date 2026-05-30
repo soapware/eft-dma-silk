@@ -116,16 +116,24 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Exits
         }
 
         /// <summary>
-        /// Checks whether this exfil is available for the given local player.
+        /// Returns true if the local player's faction and spawn entry match this exfil's eligible
+        /// list. An empty <see cref="PmcEntries"/> set means the game didn't populate the list —
+        /// treat as available to all PMC players (covers V-Ex, flare, and power extracts).
+        /// </summary>
+        public bool IsEligibleFor(Player.LocalPlayer localPlayer)
+        {
+            if (localPlayer.IsPmc)
+                return PmcEntries.Count == 0 || PmcEntries.Contains(localPlayer.EntryPoint ?? "NULL");
+            if (localPlayer.IsScav)
+                return ScavIds.Contains(localPlayer.LocalProfileId ?? "NULL");
+            return IsSecret;
+        }
+
+        /// <summary>
+        /// Checks whether this exfil is eligible for the player AND currently non-Closed.
         /// </summary>
         public bool IsAvailableFor(Player.LocalPlayer localPlayer)
-        {
-            bool eligible = (localPlayer.IsPmc && PmcEntries.Contains(localPlayer.EntryPoint ?? "NULL"))
-                         || (localPlayer.IsScav && ScavIds.Contains(localPlayer.LocalProfileId ?? "NULL"))
-                         || IsSecret;
-
-            return eligible && Status != ExfilStatus.Closed;
-        }
+            => IsEligibleFor(localPlayer) && Status != ExfilStatus.Closed;
 
         /// <summary>
         /// Draws this exfil on the radar canvas.
@@ -160,7 +168,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Exits
 
         private (SKPaint dot, SKPaint text) GetPaints(Player.LocalPlayer? localPlayer)
         {
-            if (localPlayer is not null && !IsAvailableFor(localPlayer))
+            if (localPlayer is not null && !IsEligibleFor(localPlayer))
                 return (SKPaints.PaintExfilInactive, SKPaints.TextExfilInactive);
 
             return Status switch

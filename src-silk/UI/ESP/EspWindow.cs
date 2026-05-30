@@ -514,7 +514,7 @@ namespace eft_dma_radar.Silk.UI.ESP
 
                 if (!Memory.InRaid || localPlayer is null || !CameraManager.IsActive)
                 {
-                    DrawCenteredText(canvas, "Waiting for Raid   ");
+                    DrawCenteredText(canvas, "Waiting for Raid");
                 }
                 else
                 {

@@ -26,6 +26,16 @@ namespace eft_dma_radar.Silk.UI
             float scenePx = pos.X / sScale;
             float scenePy = pos.Y / sScale;
 
+            // Killfeed overlay drag takes priority over map pan
+            if (button == MouseButton.Left && Config.ShowKillFeed
+                && KillfeedBounds.Width > 0 && KillfeedBounds.Contains(scenePx, scenePy))
+            {
+                _killfeedDragging = true;
+                _killfeedDragOffset = new Vector2(scenePx - KillfeedBounds.Left, scenePy - KillfeedBounds.Top);
+                _lastMousePosition = pos;
+                return;
+            }
+
             // Player counter overlay drag
             if (button == MouseButton.Left
                 && PlayerCounterBounds.Width > 0 && PlayerCounterBounds.Contains(scenePx, scenePy))
@@ -42,6 +52,11 @@ namespace eft_dma_radar.Silk.UI
 
         private static void OnMouseUp(IMouse mouse, MouseButton button)
         {
+            if (_killfeedDragging)
+            {
+                _killfeedDragging = false;
+                Config.Save();
+            }
             if (_playerCounterDragging)
             {
                 _playerCounterDragging = false;
@@ -52,6 +67,15 @@ namespace eft_dma_radar.Silk.UI
 
         private static void OnMouseMove(IMouse mouse, Vector2 position)
         {
+            if (_killfeedDragging)
+            {
+                var scale = UIScale;
+                Config.KillFeedPosX = (position.X / scale) - _killfeedDragOffset.X;
+                Config.KillFeedPosY = (position.Y / scale) - _killfeedDragOffset.Y;
+                _lastMousePosition = position;
+                return;
+            }
+
             if (_playerCounterDragging)
             {
                 var scale = UIScale;
@@ -163,14 +187,11 @@ namespace eft_dma_radar.Silk.UI
 
         private static void OnMouseScroll(IMouse mouse, ScrollWheel scroll)
         {
-            // ImGuiController v2.23.0 uses the old direct io.MouseWheel API which Dear ImGui 1.89+
-            // clears in NewFrame() before reading. Accumulate here and inject via AddMouseWheelEvent()
-            // (the correct queue-based API) after _imgui.Update() in DrawImGuiUI.
-            if (ImGui.GetIO().WantCaptureMouse)
-            {
-                _pendingImGuiScroll += scroll.Y;
+            // Let ImGui windows (e.g. the Map Generator preview) consume the wheel
+            // first — otherwise scrolling over a panel also zooms the radar map
+            // behind it and the panel's own zoom appears not to work.
+            if (ImGuiNET.ImGui.GetIO().WantCaptureMouse)
                 return;
-            }
 
             if (!InRaid)
                 return;
@@ -195,39 +216,6 @@ namespace eft_dma_radar.Silk.UI
             _zoom = newZoom;
         }
 
-        internal static void ToggleRadarFullscreen()
-        {
-            if (_fakeFullscreen)
-            {
-                _window.WindowBorder = WindowBorder.Resizable;
-                _window.Size         = _savedFsSize;
-                _window.Position     = _savedFsPos;
-                _fakeFullscreen      = false;
-            }
-            else
-            {
-                _savedFsSize = _window.Size;
-                _savedFsPos  = _window.Position;
-                int cx = _window.Position.X + _window.Size.X / 2;
-                int cy = _window.Position.Y + _window.Size.Y / 2;
-                var mon = MonitorInfo.GetAllMonitors()
-                    .FirstOrDefault(m => cx >= m.Left && cx < m.Left + m.Width
-                                      && cy >= m.Top  && cy < m.Top  + m.Height)
-                    ?? MonitorInfo.GetMonitor(0);
-                _window.WindowBorder = WindowBorder.Hidden;
-                _window.Size         = new Vector2D<int>(mon.Width, mon.Height);
-                _window.Position     = new Vector2D<int>(mon.Left, mon.Top);
-                _fakeFullscreen      = true;
-            }
-            Config.RadarFullscreen = _fakeFullscreen;
-            Config.MarkDirty();
-
-            // GLFW can hide the cursor when a borderless window fills the screen —
-            // force it back to Normal so the cursor remains visible in fake fullscreen.
-            foreach (var mouse in _input.Mice)
-                mouse.Cursor.CursorMode = CursorMode.Normal;
-        }
-
         private static void OnKeyDown(IKeyboard keyboard, Key key, int scancode)
         {
             // F8 is a global debug toggle — always fires regardless of ImGui focus
@@ -237,13 +225,6 @@ namespace eft_dma_radar.Silk.UI
                 Log.WriteLine($"[RadarWindow] Debug logging {(Log.EnableDebugLogging ? "ON" : "OFF")}");
                 if (Log.EnableDebugLogging)
                     Memory.Game?.DumpAll();
-                return;
-            }
-
-            // F11 — borderless windowed fullscreen on whichever monitor the radar is on
-            if (key == Key.F11)
-            {
-                ToggleRadarFullscreen();
                 return;
             }
 
@@ -534,6 +515,41 @@ namespace eft_dma_radar.Silk.UI
             }
 
             return false;
+        }
+
+        #endregion
+
+        #region Fullscreen
+
+        internal static void ToggleRadarFullscreen()
+        {
+            if (_fakeFullscreen)
+            {
+                _window.WindowBorder = WindowBorder.Resizable;
+                _window.Size         = _savedFsSize;
+                _window.Position     = _savedFsPos;
+                _fakeFullscreen      = false;
+            }
+            else
+            {
+                _savedFsSize = _window.Size;
+                _savedFsPos  = _window.Position;
+                int cx = _window.Position.X + _window.Size.X / 2;
+                int cy = _window.Position.Y + _window.Size.Y / 2;
+                var mon = MonitorInfo.GetAllMonitors()
+                    .FirstOrDefault(m => cx >= m.Left && cx < m.Left + m.Width
+                                      && cy >= m.Top  && cy < m.Top  + m.Height)
+                    ?? MonitorInfo.GetMonitor(0);
+                _window.WindowBorder = WindowBorder.Hidden;
+                _window.Size         = new Vector2D<int>(mon.Width, mon.Height);
+                _window.Position     = new Vector2D<int>(mon.Left, mon.Top);
+                _fakeFullscreen      = true;
+            }
+            Config.RadarFullscreen = _fakeFullscreen;
+            Config.MarkDirty();
+
+            foreach (var mouse in _input.Mice)
+                mouse.Cursor.CursorMode = CursorMode.Normal;
         }
 
         #endregion

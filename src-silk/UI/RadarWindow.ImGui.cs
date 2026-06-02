@@ -227,6 +227,11 @@ namespace eft_dma_radar.Silk.UI
                 PlayerHistoryPanel.IsOpen = !PlayerHistoryPanel.IsOpen;
             if (ImGui.MenuItem("⌕ Watchlist", null, PlayerWatchlistPanel.IsOpen))
                 PlayerWatchlistPanel.IsOpen = !PlayerWatchlistPanel.IsOpen;
+            if (ImGui.MenuItem("⊞ Map Generator", null,
+                eft_dma_radar.Silk.Tarkov.Unity.PhysX.MapGenWindow.IsVisible))
+                eft_dma_radar.Silk.Tarkov.Unity.PhysX.MapGenWindow.Toggle();
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Live preview + tuning for the top-down map export (PhysX snapshot).");
 
             ImGui.Separator();
 
@@ -806,6 +811,12 @@ namespace eft_dma_radar.Silk.UI
                     EspCustomizationPanel.IsOpen = false;
                 }
             }
+
+            // Vischeck windows — own visibility state (toggled via hotkey),
+            // unconditionally drawable so they don't depend on Sidebar UI.
+            eft_dma_radar.Silk.Tarkov.Unity.PhysX.VisCheckDebugWindow.Draw();
+            eft_dma_radar.Silk.Tarkov.Unity.PhysX.CacheViewWindow.Draw();
+            eft_dma_radar.Silk.Tarkov.Unity.PhysX.MapGenWindow.Draw();
 
             // Right-dock layout (Players / Loot / Quests) — must be initialized
             // BEFORE those panels' Draw() is called so SetNextWindowPos/Size land.

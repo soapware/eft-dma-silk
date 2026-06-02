@@ -551,6 +551,19 @@ button.small:active { transform: scale(.97); }
 .tooltip .t-grid .k { color: var(--text-dim); }
 .tooltip .t-grid .v { text-align: right; font-family: "Cascadia Code", "Fira Code", monospace; }
 
+/* Equipment breakdown */
+.tooltip .t-eq-h {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+.tooltip .t-grid.t-eq .v {
+  text-align: left;
+  font-family: inherit;
+}
+.tooltip .t-price { color: var(--ok); }
+
 /* ═══════════════════════════════════════════════════════════════════════════
    PLAYER COUNT CHIPS (status area)
    ═══════════════════════════════════════════════════════════════════════════ */

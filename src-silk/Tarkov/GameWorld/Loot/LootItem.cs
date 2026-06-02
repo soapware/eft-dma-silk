@@ -189,6 +189,23 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
                 canvas.DrawCircle(screenPos, radius, paint);
             }
 
+            // Pinged-loot highlight — a steady magenta ring plus an expanding "sonar"
+            // pulse so the item stands out among dense loot. Pings come from the loot
+            // panel and are purely visual (no effect on filtering/visibility).
+            if (LootPing.IsPinged(ShortName))
+            {
+                var ping = SKPaints.LootPingRing;
+
+                // Steady ring hugging the marker — always visible.
+                ping.Color = _pingColor;
+                canvas.DrawCircle(screenPos, radius + 3.5f, ping);
+
+                // Expanding, fading pulse on a ~1.1s loop (shared clock = synced pulse).
+                float phase = (Environment.TickCount64 % 1100) / 1100f;
+                ping.Color = _pingColor.WithAlpha((byte)(200f * (1f - phase)));
+                canvas.DrawCircle(screenPos, radius + 3.5f + phase * 9f, ping);
+            }
+
             // Cache label string — encode state into key. Includes the displayed integer
             // height bucket so the "+Nm" portion of the label refreshes when the player
             // moves up/down past a whole-meter boundary (previously stale).
@@ -232,6 +249,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Loot
         // Render-thread-only reusable path for height-direction arrow triangles.
         // Reset and repopulated each draw call — avoids per-item SKPath allocations.
         private static readonly SKPath _arrowPath = new();
+
+        // Base color for the pinged-loot highlight ring (magenta — distinct from the
+        // green/cyan/gold/orange tier palette).
+        private static readonly SKColor _pingColor = new(255, 60, 210);
 
         /// <summary>
         /// Populates a reusable <see cref="SKPath"/> with a filled triangle centered on <paramref name="p"/>.

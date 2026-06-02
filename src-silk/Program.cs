@@ -19,10 +19,7 @@ namespace eft_dma_radar.Silk
 {
     internal static partial class SilkProgram
     {
-        internal static string Name =>
-            string.IsNullOrEmpty(Memory.GameVersion)
-                ? "EFT (Silk.NET)"
-                : $"EFT ({Memory.GameVersion}) Silk.NET";
+        internal const string Name = "EFT DMA Radar (Silk.NET)";
 
         internal static MemoryState State => Memory.State;
 
@@ -63,60 +60,25 @@ namespace eft_dma_radar.Silk
                 Config = SilkConfig.Load();
                 Log.WriteLine("[SilkProgram] Config loaded OK.");
 
-                // -clear-cache: nuke IL2CPP offset cache files to force a live dump on next raid.
-                // Useful after an EFT game update so stale PE-fingerprint caches are discarded.
-                var cliArgs = Environment.GetCommandLineArgs();
-                if (cliArgs?.Contains("-clear-cache", StringComparer.OrdinalIgnoreCase) ?? false)
-                {
-                    var cacheDir = Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                        "eft-dma-radar-silk");
-                    foreach (var f in new[] { "il2cpp_offsets_pe.json", "il2cpp_offsets_rva.json" })
-                    {
-                        var path = Path.Combine(cacheDir, f);
-                        if (File.Exists(path)) { File.Delete(path); Log.WriteLine($"[SilkProgram] Deleted cache: {f}"); }
-                    }
-                }
-
                 // Wire debug logging from config or -debug command-line argument
                 Log.EnableDebugLogging = Config.DebugLogging ||
-                    (cliArgs?.Contains("-debug", StringComparer.OrdinalIgnoreCase) ?? false);
+                    (Environment.GetCommandLineArgs()?.Contains("-debug", StringComparer.OrdinalIgnoreCase) ?? false);
                 if (Log.EnableDebugLogging)
                     Log.WriteLine("[SilkProgram] Debug logging enabled.");
 
-                // Clean console mode: suppress raw log lines and use StartupConsole instead.
-                // Disabled when -debug is active so all raw lines remain visible.
-                Log.CleanMode = !Log.EnableDebugLogging;
-                StartupConsole.PrintHeader();
+                // Vischeck — apply persisted classifier rules + worker toggles +
+                // diagnostic-logging flags to the live static singletons before
+                // anything that might attach starts.
+                eft_dma_radar.Silk.Tarkov.Unity.PhysX.VisibilityClassifier.LoadFromConfig(Config);
+                eft_dma_radar.Silk.Tarkov.Unity.PhysX.VisibilityWorker.LoadFromConfig(Config);
+                eft_dma_radar.Silk.Tarkov.Unity.PhysX.VisCheckDiagnostics.LoadFromConfig(Config);
 
+                if (Config.TraceDmaExceptions) ExceptionTracer.Enabled = true;
                 ExceptionTracer.Install();
 
-                // Pre-load native DLLs BEFORE any system state changes (power plan, priority).
-                // SetHighPerformanceMode changes USB power management which briefly disrupts
-                // the FT601 device; loading and connecting first avoids that window.
-                var baseDir = AppContext.BaseDirectory;
-                Log.WriteLine($"[SilkProgram] BaseDirectory: {baseDir}");
-                foreach (var dll in new[] { "FTD3XX.dll", "leechcore.dll", "vmm.dll" })
-                    NativeLibrary.Load(Path.Combine(baseDir, dll));
-
-                // Probe FT601 USB device count and attempt a soft reset before VMM init.
-                // If count > 0, the device is visible to the driver; cycle to clear any stale state.
-                // If count = 0, the device is not enumerated by Windows — user must replug or reboot.
-                uint ft601Count = ProbeFt601DeviceCount();
-                Log.WriteLine($"[FT601] USB device count: {ft601Count}");
-                if (ft601Count > 0)
-                {
-                    StartupConsole.PrintStep("USB", $"FT601 detected ({ft601Count} device(s))", StepState.Ok);
-                    TryResetFt601(baseDir);
-                }
-                else
-                {
-                    StartupConsole.PrintStep("USB", "FT601 not detected — check USB cable / Device Manager", StepState.Warn);
-                }
+                SetHighPerformanceMode();
 
                 Memory.ModuleInit(Config);
-
-                SetHighPerformanceMode();
                 Memory.GameStarted += (_, _) => ProfileService.Start();
                 Memory.GameStopped += (_, _) => ProfileService.Stop();
                 Memory.GameStarted += (_, _) =>
@@ -171,66 +133,6 @@ namespace eft_dma_radar.Silk
                 HotkeyManager.UnregisterAll();
                 InputManager.Shutdown();
                 Memory.Close();
-            }
-        }
-
-        /// <summary>Returns the number of FT601 USB devices currently visible to the FTD3XX driver.</summary>
-        private static uint ProbeFt601DeviceCount()
-        {
-            try
-            {
-                [DllImport("FTD3XX.dll", CallingConvention = CallingConvention.Cdecl)]
-                static extern uint FT_CreateDeviceInfoList(out uint numDevices);
-                FT_CreateDeviceInfoList(out uint count);
-                return count;
-            }
-            catch { return 0; }
-        }
-
-        /// <summary>
-        /// Attempts a soft-reset of the FT601 USB device via FTD3XX.dll P/Invoke.
-        /// Opens device index 0, cycles the port, and closes it so the next
-        /// VMMDLL_InitializeEx gets a clean connection even if a prior process was force-killed.
-        /// </summary>
-        private static void TryResetFt601(string baseDir)
-        {
-            try
-            {
-                [DllImport("FTD3XX.dll", CallingConvention = CallingConvention.Cdecl)]
-                static extern uint FT_CreateDeviceInfoList(out uint numDevices);
-
-                [DllImport("FTD3XX.dll", CallingConvention = CallingConvention.Cdecl)]
-                static extern uint FT_Create(uint pvArg, uint dwOpenBy, out nint pftHandle);
-
-                [DllImport("FTD3XX.dll", CallingConvention = CallingConvention.Cdecl)]
-                static extern uint FT_Close(nint ftHandle);
-
-                [DllImport("FTD3XX.dll", CallingConvention = CallingConvention.Cdecl)]
-                static extern uint FT_CycleDevicePort(nint ftHandle);
-
-                const uint FT_OK = 0;
-                const uint FT_OPEN_BY_INDEX = 0;
-
-                uint status = FT_CreateDeviceInfoList(out uint count);
-                Log.WriteLine($"[FT601] FT_CreateDeviceInfoList: status={status} count={count}");
-                if (status != FT_OK || count == 0)
-                    return;
-
-                status = FT_Create(0, FT_OPEN_BY_INDEX, out nint handle);
-                Log.WriteLine($"[FT601] FT_Create(0): status={status} handle=0x{handle:X}");
-                if (status != FT_OK || handle == 0)
-                    return;
-
-                status = FT_CycleDevicePort(handle);
-                Log.WriteLine($"[FT601] FT_CycleDevicePort: status={status}");
-                FT_Close(handle);
-
-                Thread.Sleep(3000); // wait for USB re-enumeration after cycle
-                Log.WriteLine("[FT601] Reset complete.");
-            }
-            catch (Exception ex)
-            {
-                Log.WriteLine($"[FT601] Reset skipped: {ex.Message}");
             }
         }
 

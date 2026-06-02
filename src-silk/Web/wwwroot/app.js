@@ -2622,18 +2622,47 @@ function updateHover() {
       distStr = Math.round(Math.sqrt(dx * dx + dy * dy + dz * dz)) + "m";
     }
 
-    const hasExtra = (p.gearValue > 0) || (readWorldY(p) != null) || distStr;
-    if (hasExtra) {
+    const wy = readWorldY(p);
+    const alive = p.isAlive !== false;
+    const showHealth = alive && p.health != null;
+    const showHands = !!p.inHandsItem;
+    const showOptics = p.hasThermal || p.hasNVG;
+    const hasGrid = distStr || showHealth || showHands || (p.gearValue > 0) || showOptics || (wy != null);
+    if (hasGrid) {
       html += `<div class="t-sep"></div><div class="t-grid">`;
       if (distStr) {
         html += `<span class="k">Distance</span><span class="v">${distStr}</span>`;
       }
+      if (showHealth) {
+        html += `<span class="k">Health</span><span class="v" style="color:${healthColor(p.health)}">${healthLabel(p.health)}</span>`;
+      }
+      if (showHands) {
+        html += `<span class="k">In Hands</span><span class="v">${esc(p.inHandsItem)}</span>`;
+        if (p.inHandsAmmo) {
+          html += `<span class="k">Ammo</span><span class="v">${esc(p.inHandsAmmo)}</span>`;
+        }
+      }
       if (p.gearValue > 0) {
         html += `<span class="k">Gear</span><span class="v">₽${p.gearValue.toLocaleString()}</span>`;
       }
-      const wy = readWorldY(p);
+      if (showOptics) {
+        const optics = [];
+        if (p.hasThermal) optics.push(`<span style="color:var(--bad)">Thermal</span>`);
+        if (p.hasNVG) optics.push(`<span style="color:var(--ok)">NVG</span>`);
+        html += `<span class="k">Optics</span><span class="v">${optics.join(" · ")}</span>`;
+      }
       if (wy != null) {
         html += `<span class="k">Height</span><span class="v">${wy.toFixed(1)}</span>`;
+      }
+      html += `</div>`;
+    }
+
+    // Equipment breakdown — mirrors the desktop player tooltip's gear list.
+    if (Array.isArray(p.gear) && p.gear.length) {
+      html += `<div class="t-sep"></div><div class="t-eq-h">Equipment</div><div class="t-grid t-eq">`;
+      for (const g of orderGear(p.gear)) {
+        const price = g.price > 0 ? ` <span class="t-price">(₽${g.price.toLocaleString()})</span>` : "";
+        html += `<span class="k">${esc(slotLabel(g.slot))}</span><span class="v">${esc(g.name)}${price}</span>`;
       }
       html += `</div>`;
     }
@@ -2695,6 +2724,54 @@ function esc(s) {
   const d = document.createElement("div");
   d.textContent = s;
   return d.innerHTML;
+}
+
+/* Observed health tiers (match Player.Draw HealthLabels / EHealthStatus). */
+function healthLabel(h) {
+  switch (h) {
+    case 1: return "Injured";
+    case 2: return "Badly Injured";
+    case 3: return "Dying";
+    default: return "Healthy";
+  }
+}
+function healthColor(h) {
+  switch (h) {
+    case 1: return "var(--warn)";
+    case 2:
+    case 3: return "var(--bad)";
+    default: return "var(--ok)";
+  }
+}
+
+/* Equipment slot display names + ordering (mirror PlayerInfoWidget.FormatSlotName). */
+const GEAR_ORDER = [
+  "FirstPrimaryWeapon", "SecondPrimaryWeapon", "Holster", "Headwear", "FaceCover",
+  "ArmorVest", "TacticalVest", "Backpack", "SecuredContainer", "Eyewear",
+  "Earpiece", "Scabbard",
+];
+function slotLabel(slot) {
+  switch (slot) {
+    case "FirstPrimaryWeapon":  return "Primary";
+    case "SecondPrimaryWeapon": return "Secondary";
+    case "Holster":             return "Pistol";
+    case "Headwear":            return "Head";
+    case "FaceCover":           return "Face";
+    case "ArmorVest":           return "Armor";
+    case "TacticalVest":        return "Rig";
+    case "Backpack":            return "Backpack";
+    case "SecuredContainer":    return "Secure";
+    case "Eyewear":             return "Eyes";
+    case "Earpiece":            return "Ears";
+    case "Scabbard":            return "Melee";
+    default:                    return slot;
+  }
+}
+function orderGear(gear) {
+  return [...gear].sort((a, b) => {
+    const ia = GEAR_ORDER.indexOf(a.slot), ib = GEAR_ORDER.indexOf(b.slot);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

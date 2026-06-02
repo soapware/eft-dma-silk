@@ -158,6 +158,41 @@ internal static class HotkeyManager
         new("ResetSidePanels", "Reset Side Panels", "Layout",
             "Snap Players / Loot / Quests back into the right dock layout",
             static e => { if (e.IsDown) eft_dma_radar.Silk.UI.Shell.RightDock.RequestResnap(); }),
+
+        // VisCheck (PhysX visibility) — no default keys, user binds via the
+        // Hotkey panel. Listed in a dedicated category so they're discoverable.
+        new("VisCheckDebugToggle", "VisCheck Debug Window", "VisCheck",
+            "Toggle the VisCheck debug overlay (worker stats, Top Blockers, classifier rules)",
+            static e => { if (e.IsDown) eft_dma_radar.Silk.Tarkov.Unity.PhysX.VisCheckDebugWindow.Toggle(); }),
+
+        new("VisCheckCacheViewToggle", "VisCheck Cache View", "VisCheck",
+            "Toggle the 3D wireframe Cache View (PhysX scene + live player overlay)",
+            static e => { if (e.IsDown) eft_dma_radar.Silk.Tarkov.Unity.PhysX.CacheViewWindow.Toggle(); }),
+
+        new("VisCheckRebuild", "VisCheck Rebuild Snapshot", "VisCheck",
+            "Force-rebuild the PhysX scene snapshot for the current map",
+            static e => {
+                if (!e.IsDown) return;
+                var map = Memory.Game?.MapID;
+                if (!string.IsNullOrEmpty(map))
+                    eft_dma_radar.Silk.Tarkov.Unity.PhysX.SceneCache.TriggerBuild(map);
+            }),
+
+        new("VisCheckGenerateMap", "VisCheck Generate Map", "VisCheck",
+            "Generate a top-down SVG map + config from the current PhysX snapshot (writes to generated_maps/)",
+            static e => {
+                if (!e.IsDown) return;
+                var snap = eft_dma_radar.Silk.Tarkov.Unity.PhysX.SceneCache.Snapshot;
+                var map = Memory.Game?.MapID ?? "unknown";
+                if (eft_dma_radar.Silk.Tarkov.Unity.PhysX.MapImageGenerator.Generate(snap, map, null, out var dir, out var err))
+                    Log.WriteLine($"[MapGen] Map written to {dir}");
+                else
+                    Log.WriteLine($"[MapGen] Failed: {err}");
+            }),
+
+        new("VisCheckMapGenWindow", "VisCheck Map Generator", "VisCheck",
+            "Toggle the Map Generator panel (live preview + tuning for the top-down map export)",
+            static e => { if (e.IsDown) eft_dma_radar.Silk.Tarkov.Unity.PhysX.MapGenWindow.Toggle(); }),
     ];
 
     /// <summary>Lookup from action ID to definition, for fast access.</summary>

@@ -257,6 +257,19 @@ namespace eft_dma_radar.Silk.UI
             IsAntialias = true,
         };
 
+        /// <summary>
+        /// Pulsing ring drawn around pinged loot dots. Its color/alpha are mutated
+        /// per-draw to animate the pulse; only the radar render thread (LootItem.Draw)
+        /// touches it, so the in-place mutation is safe.
+        /// </summary>
+        public static SKPaint LootPingRing { get; } = new()
+        {
+            Color = new SKColor(255, 60, 210),
+            StrokeWidth = 2f,
+            Style = SKPaintStyle.Stroke,
+            IsAntialias = true,
+        };
+
         /// <summary>Outline/stroke drawn behind loot height-arrow triangles for contrast.</summary>
         public static SKPaint LootArrowOutline { get; } = new()
         {

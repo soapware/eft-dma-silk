@@ -87,6 +87,13 @@ namespace eft_dma_radar.Silk.UI.Maps
         {
             try
             {
+                // Raster layers (e.g. maps produced by MapImageGenerator) load
+                // directly — no SVG parse. SVG maps fall through below.
+                if (svgPath.EndsWith(".png", StringComparison.OrdinalIgnoreCase)
+                    || svgPath.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase)
+                    || svgPath.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase))
+                    return RasterizeImageLayer(svgPath, svgScale);
+
                 using var stream = File.OpenRead(svgPath);
                 using var svg = SKSvg.CreateFromStream(stream);
                 if (svg is null) return null;
@@ -120,6 +127,41 @@ namespace eft_dma_radar.Silk.UI.Maps
             catch (Exception ex)
             {
                 Log.WriteLine($"[RadarMap] Failed to rasterize '{svgPath}': {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Loads a raster (PNG/JPG) map layer. <paramref name="scale"/> mirrors the
+        /// SVG path's <c>svgScale</c>: generated maps render at full resolution with
+        /// svgScale = 1, so this is normally a straight decode.
+        /// </summary>
+        private static SKImage? RasterizeImageLayer(string imagePath, float scale)
+        {
+            try
+            {
+                using var data = SKData.Create(imagePath);
+                if (data is null) return null;
+                var image = SKImage.FromEncodedData(data);
+                if (image is null) return null;
+
+                if (MathF.Abs(scale - 1f) < 0.001f || scale <= 0f)
+                    return image;
+
+                var info = new SKImageInfo(
+                    Math.Max(1, (int)(image.Width  * scale)),
+                    Math.Max(1, (int)(image.Height * scale)),
+                    SKColorType.Rgba8888, SKAlphaType.Premul);
+                using var surface = SKSurface.Create(info);
+                if (surface is null) return image; // fall back to unscaled
+                surface.Canvas.Clear(SKColors.Transparent);
+                surface.Canvas.DrawImage(image, new SKRect(0, 0, info.Width, info.Height), _svgPaint);
+                image.Dispose();
+                return surface.Snapshot();
+            }
+            catch (Exception ex)
+            {
+                Log.WriteLine($"[RadarMap] Failed to load raster layer '{imagePath}': {ex.Message}");
                 return null;
             }
         }

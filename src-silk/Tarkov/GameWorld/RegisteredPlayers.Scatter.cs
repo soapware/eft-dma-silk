@@ -111,6 +111,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                                 $"[RegisteredPlayers] Position compute failed for '{entry.Player.Name}' (idx={entry.TransformIndex}, verts=0x{entry.VerticesAddr:X})");
                         }
 
+                        //Log.WriteRateLimited(AppLogLevel.Info,
+                        //    $"pos_ok_{entry.Base:X}", TimeSpan.FromSeconds(1),
+                        //    $"[RegisteredPlayers] Position read OK for '{entry.Player.Name}' (idx={entry.TransformIndex}, verts=0x{entry.VerticesAddr:X}) pos={entry.Player.Position}");
+
                         // LookPosition for local player — same TransformInternal, same vertices, same result.
                         // Just copy the already-computed position (avoids a redundant hierarchy walk).
                         if (posOk && entry.LookTransformReady && entry.Player is Player.LocalPlayer localPlayer)

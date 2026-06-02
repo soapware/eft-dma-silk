@@ -606,17 +606,6 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             }
         }
 
-        /// Reads the voice string from an observed player's base address (OPV+0x40).
-        /// Returns null if the read fails or yields an empty string.
-        private static string? ReadObservedPlayerVoice(ulong playerBase)
-        {
-            if (!playerBase.IsValidVirtualAddress()) return null;
-            if (!Memory.TryReadPtr(playerBase + Offsets.ObservedPlayerView.Voice, out var ptr)) return null;
-            if (!ptr.IsValidVirtualAddress()) return null;
-            if (!Memory.TryReadUnityString(ptr, out var val)) return null;
-            return string.IsNullOrWhiteSpace(val) ? null : val;
-        }
-
         /// <summary>
         /// Writes a full IL2CPP class hierarchy dump for every addressable raid object
         /// (GameWorld, players, corpses, exfils, grenades) to

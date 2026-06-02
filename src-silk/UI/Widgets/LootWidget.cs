@@ -107,6 +107,10 @@ namespace eft_dma_radar.Silk.UI.Widgets
             DrawSummary(visibleCount, totalValue, loot?.Count ?? 0);
             ImGui.Separator();
 
+            // Ping management bar (only shown when something is pinged) — lets you
+            // clear pings even when no loot currently matches the filters.
+            DrawPingBar();
+
             if (visibleCount == 0)
             {
                 ImGui.TextColored(UITheme.Dim, "No loot matches current filters");
@@ -137,6 +141,26 @@ namespace eft_dma_radar.Silk.UI.Widgets
             ImGui.TextColored(UITheme.Dim, " items");
         }
 
+        /// <summary>
+        /// Compact bar shown only while loot is pinged: a count, a clear button, and a
+        /// hint. Lets the user drop all pings without hunting for each row.
+        /// </summary>
+        private static void DrawPingBar()
+        {
+            if (!LootPing.Any)
+                return;
+
+            ImGui.TextColored(UITheme.Magenta, $"◎ {LootPing.Count} pinged");
+            ImGui.SameLine();
+            if (ImGui.SmallButton("Clear##pings"))
+                LootPing.Clear();
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Remove all loot pings");
+            ImGui.SameLine();
+            ImGui.TextColored(UITheme.Dim, "highlighted on radar");
+            ImGui.Separator();
+        }
+
         private static void DrawTable()
         {
             ImGui.PushStyleVar(ImGuiStyleVar.CellPadding, new Vector2(6, 2));
@@ -146,12 +170,14 @@ namespace eft_dma_radar.Silk.UI.Widgets
                         ImGuiTableFlags.Sortable | ImGuiTableFlags.SortMulti |
                         ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.NoPadOuterX;
 
-            if (!ImGui.BeginTable("LootTable", 5, flags))
+            if (!ImGui.BeginTable("LootTable", 6, flags))
             {
                 ImGui.PopStyleVar();
                 return;
             }
 
+            // Leading ping column (not sortable) — toggles a radar highlight per item.
+            ImGui.TableSetupColumn("◎", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, 28f, 5);
             ImGui.TableSetupColumn("Item",  ImGuiTableColumnFlags.WidthStretch, 0f, 0);
             ImGui.TableSetupColumn("Price", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultSort | ImGuiTableColumnFlags.PreferSortDescending, 65f, 1);
             ImGui.TableSetupColumn("Qty",   ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.PreferSortDescending, 32f, 2);
@@ -170,11 +196,26 @@ namespace eft_dma_radar.Silk.UI.Widgets
                 var g = _sorted[i];
                 ImGui.TableNextRow();
 
+                bool pinged = LootPing.IsPinged(g.ShortName);
+
                 var color = g.IsWishlisted
                     ? UITheme.OverlayLootWishlist
                     : g.IsImportant
                     ? UITheme.OverlayLootImportant
                     : UITheme.OverlayLoot;
+
+                // Ping toggle — highlights every matching ground item on the radar.
+                ImGui.TableNextColumn();
+                if (pinged)
+                    ImGui.PushStyleColor(ImGuiCol.Button, UITheme.Magenta);
+                if (ImGui.SmallButton($"◎##ping{i}"))
+                    LootPing.Toggle(g.ShortName);
+                if (pinged)
+                    ImGui.PopStyleColor();
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip(pinged
+                        ? "Un-ping: stop highlighting on the radar"
+                        : "Ping: highlight this item on the radar");
 
                 // Item name
                 ImGui.TableNextColumn();

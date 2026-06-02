@@ -20,6 +20,29 @@ namespace eft_dma_radar.Silk.Web.Data
         public int GroupId { get; set; }
         public int GearValue { get; set; }
 
+        // ── Loadout detail (mirrors the desktop player tooltip: hands / gear / health) ──
+
+        /// <summary>Short name of the item currently in hands (null until read).</summary>
+        public string? InHandsItem { get; set; }
+
+        /// <summary>Chambered ammo short name when a weapon is held (null otherwise).</summary>
+        public string? InHandsAmmo { get; set; }
+
+        /// <summary>Whether a thermal optic/device is equipped.</summary>
+        public bool HasThermal { get; set; }
+
+        /// <summary>Whether night-vision is equipped.</summary>
+        public bool HasNVG { get; set; }
+
+        /// <summary>
+        /// Observed health tier: 0 = Healthy, 1 = Injured, 2 = Badly Injured, 3 = Dying.
+        /// Null for the local player (health is not observed for ourselves).
+        /// </summary>
+        public int? Health { get; set; }
+
+        /// <summary>Per-slot equipment breakdown. Null until gear has been read.</summary>
+        public WebRadarGearEntry[]? Gear { get; set; }
+
         // World-space position (body root / feet reference used by the radar map)
         public float WorldX { get; set; }
         public float WorldY { get; set; }
@@ -148,6 +171,12 @@ namespace eft_dma_radar.Silk.Web.Data
                 IsHuman = player.IsHuman,
                 GroupId = player.SpawnGroupID,
                 GearValue = player.GearValue,
+                InHandsItem = player.HandsReady ? player.InHandsItem : null,
+                InHandsAmmo = player.HandsReady ? player.InHandsAmmo : null,
+                HasThermal = player.HasThermal,
+                HasNVG = player.HasNVG,
+                Health = isLocal ? null : (int)player.HealthStatus,
+                Gear = BuildGear(player),
                 WorldX = pos.X,
                 WorldY = pos.Y,
                 WorldZ = pos.Z,
@@ -170,5 +199,47 @@ namespace eft_dma_radar.Silk.Web.Data
                 Bones = bones,
             };
         }
+
+        /// <summary>
+        /// Flattens a player's equipment dictionary into serializable slot/name/price
+        /// entries for the web tooltip. Returns null until gear has been read.
+        /// </summary>
+        private static WebRadarGearEntry[]? BuildGear(Player player)
+        {
+            if (!player.GearReady)
+                return null;
+
+            var equip = player.Equipment;
+            if (equip.Count == 0)
+                return null;
+
+            var gear = new WebRadarGearEntry[equip.Count];
+            int i = 0;
+            foreach (var kvp in equip)
+            {
+                gear[i++] = new WebRadarGearEntry
+                {
+                    Slot = kvp.Key,
+                    Name = kvp.Value.Short,
+                    Price = kvp.Value.Price,
+                };
+            }
+            return gear;
+        }
+    }
+
+    /// <summary>
+    /// A single equipped item, flattened for the web radar gear breakdown.
+    /// </summary>
+    public sealed class WebRadarGearEntry
+    {
+        /// <summary>Raw equipment slot key (e.g. "FirstPrimaryWeapon"). Formatted client-side.</summary>
+        public string Slot { get; set; } = string.Empty;
+
+        /// <summary>Short item name.</summary>
+        public string Name { get; set; } = string.Empty;
+
+        /// <summary>Best rouble price (0 if unknown).</summary>
+        public int Price { get; set; }
     }
 }

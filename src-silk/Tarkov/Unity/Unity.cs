@@ -259,21 +259,6 @@ namespace eft_dma_radar.Silk.Tarkov.Unity
 
             return rot;
         }
-
-        /// <summary>
-        /// Extracts the Y-axis rotation (yaw) in degrees from the accumulated world rotation quaternion.
-        /// </summary>
-        internal static float ComputeWorldYawDeg(
-            ReadOnlySpan<TrsX> vertices,
-            ReadOnlySpan<int> parentIndices,
-            int index)
-        {
-            var q = ComputeWorldRotation(vertices, parentIndices, index);
-            // Yaw around Unity Y axis: atan2(2(wy+xz), 1-2(yy+zz))  — standard formula
-            float yaw = MathF.Atan2(2f * (q.W * q.Y + q.X * q.Z),
-                                    1f - 2f * (q.Y * q.Y + q.Z * q.Z));
-            return yaw * (180f / MathF.PI);
-        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────────

@@ -26,5 +26,10 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Ballistics
         public Vector3 StartPosition { get; internal set; }
         /// <summary>Trail point history (oldest first). Tracker decides when to append.</summary>
         public List<Vector3> Trail { get; } = new(32);
+        /// <summary>
+        /// Set the moment the bullet leaves the game's active Shots list (hit something).
+        /// <see cref="DateTime.MinValue"/> means the bullet is still in flight.
+        /// </summary>
+        public DateTime HitTime { get; internal set; } = DateTime.MinValue;
     }
 }

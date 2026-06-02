@@ -87,6 +87,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
         private static float _fov;
         private static float _aspect;
+        private static float _opticFov;
+        private static float _opticAspect;
         private static readonly ViewMatrix _viewMatrix = new();
 
         private static float _jitterX;
@@ -214,6 +216,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
         /// <param name="onScreenCheck">If true, returns false when off-screen.</param>
         /// <param name="useTolerance">If true, expands the on-screen check by <see cref="VIEWPORT_TOLERANCE"/>.</param>
         /// <returns>True if the projection succeeded.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool WorldToScreen(ref Vector3 worldPos, out Vector2 scrPos, bool onScreenCheck = false, bool useTolerance = false)
         {
             // Reject positions at or near world origin
@@ -363,7 +366,11 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
 
             ulong vmAddr = camera + Camera.ViewMatrix;
 
-            // Single scatter: ViewMatrix + FOV + Aspect
+            // Determine whether we also need the optic camera's FOV/Aspect this tick.
+            // Must be computed before Execute() so the scatter batch is complete.
+            bool readOpticFov = IsADS && IsScoped && OpticCamera.IsValidVirtualAddress();
+
+            // Scatter: ViewMatrix + FPS FOV/Aspect + (optionally) Optic FOV/Aspect
             using var scatter = Memory.GetScatter(VmmFlags.NOCACHE);
             scatter.PrepareReadValue<Matrix4x4>(vmAddr);
 
@@ -371,6 +378,12 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             {
                 scatter.PrepareReadValue<float>(FPSCamera + Camera.FOV);
                 scatter.PrepareReadValue<float>(FPSCamera + Camera.AspectRatio);
+            }
+
+            if (readOpticFov)
+            {
+                scatter.PrepareReadValue<float>(OpticCamera + Camera.FOV);
+                scatter.PrepareReadValue<float>(OpticCamera + Camera.AspectRatio);
             }
 
             scatter.Execute();
@@ -392,19 +405,41 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     fovChanged = fov != _fov;
                     _fov = fov;
                 }
-
                 if (scatter.ReadValue<float>(FPSCamera + Camera.AspectRatio, out var aspect) && aspect > 0.1f && aspect < 5f)
                 {
                     fovChanged |= aspect != _aspect;
                     _aspect = aspect;
                 }
 
-                // Recompute cached scoped projection scale when FOV/Aspect changes
-                if (fovChanged && _fov > 0f && _aspect > 0f)
+                // Read optic camera FOV/Aspect when scoped — needed for accurate scoped projection.
+                float prevOpticFov = _opticFov;
+                float prevOpticAspect = _opticAspect;
+                if (readOpticFov)
                 {
-                    float angleRadHalf = (MathF.PI / 180f) * _fov * 0.5f;
+                    if (scatter.ReadValue<float>(OpticCamera + Camera.FOV, out var of) && of > 1f && of < 180f)
+                        _opticFov = of;
+                    if (scatter.ReadValue<float>(OpticCamera + Camera.AspectRatio, out var oa) && oa > 0.1f && oa < 5f)
+                        _opticAspect = oa;
+                }
+                else if (_opticFov != 0f || _opticAspect != 0f)
+                {
+                    // Clear stored optic values when not scoped — forces scale recompute with FPS FOV.
+                    _opticFov = 0f;
+                    _opticAspect = 0f;
+                }
+
+                // Recompute cached scoped projection scale when any relevant FOV/Aspect changes.
+                bool opticChanged = _opticFov != prevOpticFov || _opticAspect != prevOpticAspect;
+                if ((fovChanged || opticChanged) && _fov > 0f && _aspect > 0f)
+                {
+                    // Use optic camera FOV/Aspect when available — gives correct scale for the zoomed frustum.
+                    // Fallback to FPS camera values when optic is not yet resolved (lazy first-frame).
+                    float activeFov    = (readOpticFov && _opticFov    > 1f   ) ? _opticFov    : _fov;
+                    float activeAspect = (readOpticFov && _opticAspect > 0.1f ) ? _opticAspect : _aspect;
+
+                    float angleRadHalf = (MathF.PI / 180f) * activeFov * 0.5f;
                     float angleCtg = MathF.Cos(angleRadHalf) / MathF.Sin(angleRadHalf);
-                    _scopedScaleX = 1f / (angleCtg * _aspect * 0.5f);
+                    _scopedScaleX = 1f / (angleCtg * activeAspect * 0.5f);
                     _scopedScaleY = 1f / (angleCtg * 0.5f);
                 }
             }

@@ -12,9 +12,33 @@ namespace eft_dma_radar.Silk.UI.ESP
     {
         #region Fonts
 
-        public static SKFont FontName { get; } = new(CustomFonts.Regular, 12) { Subpixel = true };
-        public static SKFont FontInfo { get; } = new(CustomFonts.Regular, 10) { Subpixel = true };
-        public static SKFont FontLoot { get; } = new(CustomFonts.Regular, 10) { Subpixel = true };
+        // Lazily-cached, scale-aware content fonts.
+        // Call SetScale() at the start of each ESP frame; it's a no-op when scale is unchanged.
+        private static float _scale = 1f;
+        private static SKFont? _fontName, _fontArial, _fontTahoma, _fontCourierNew, _fontInfo, _fontLoot;
+
+        public static SKFont FontName       => _fontName       ??= new SKFont(CustomFonts.Regular,    12 * _scale) { Subpixel = true };
+        public static SKFont FontArial      => _fontArial      ??= new SKFont(CustomFonts.Arial,      11 * _scale) { Subpixel = true };
+        public static SKFont FontTahoma     => _fontTahoma     ??= new SKFont(CustomFonts.Tahoma,     11 * _scale) { Subpixel = true };
+        public static SKFont FontCourierNew => _fontCourierNew ??= new SKFont(CustomFonts.CourierNew, 11 * _scale) { Subpixel = true };
+        public static SKFont FontInfo       => _fontInfo       ??= new SKFont(CustomFonts.Regular,    10 * _scale) { Subpixel = true };
+        public static SKFont FontLoot       => _fontLoot       ??= new SKFont(CustomFonts.Regular,    10 * _scale) { Subpixel = true };
+
+        /// <summary>
+        /// Apply a global font scale multiplier. Recreates cached fonts when the scale changes.
+        /// No-op when scale is unchanged (delta &lt; 0.01). Call once per ESP frame.
+        /// </summary>
+        public static void SetScale(float scale)
+        {
+            if (MathF.Abs(scale - _scale) < 0.01f) return;
+            _scale = scale;
+            _fontName?.Dispose();       _fontName       = null;
+            _fontArial?.Dispose();      _fontArial      = null;
+            _fontTahoma?.Dispose();     _fontTahoma     = null;
+            _fontCourierNew?.Dispose(); _fontCourierNew = null;
+            _fontInfo?.Dispose();       _fontInfo       = null;
+            _fontLoot?.Dispose();       _fontLoot       = null;
+        }
 
         #endregion
 
@@ -80,6 +104,45 @@ namespace eft_dma_radar.Silk.UI.ESP
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
         };
+
+        /// <summary>Predicted trajectory impact point — amber filled circle.</summary>
+        public static SKPaint ImpactDot { get; } = new()
+        {
+            Color = new SKColor(255, 165, 30, 240),
+            Style = SKPaintStyle.Fill,
+            IsAntialias = true,
+        };
+
+        /// <summary>Black outline behind ImpactDot for legibility on any background.</summary>
+        public static SKPaint ImpactDotOutline { get; } = new()
+        {
+            Color = new SKColor(0, 0, 0, 180),
+            Style = SKPaintStyle.Fill,
+            IsAntialias = true,
+        };
+
+        /// <summary>Range label next to the impact dot.</summary>
+        public static SKPaint ImpactText { get; } = MakeFillPaint(255, 165, 30, 230);
+
+        /// <summary>Local player's own bullet trail — orange/yellow, distinct from enemy green.</summary>
+        public static SKPaint LocalShotTrail { get; } = new()
+        {
+            Color = new SKColor(255, 200, 50, 220),
+            StrokeWidth = 2.0f,
+            Style = SKPaintStyle.Stroke,
+            StrokeCap = SKStrokeCap.Round,
+            StrokeJoin = SKStrokeJoin.Round,
+            IsAntialias = true,
+        };
+
+        /// <summary>Bullet head dot for the local player's trail.</summary>
+        public static SKPaint LocalShotHead { get; } = MakeFillPaint(255, 220, 80, 230);
+
+        /// <summary>Impact marker fill — bright red.</summary>
+        public static SKPaint LocalImpactDot { get; } = MakeFillPaint(255, 80, 80, 240);
+
+        /// <summary>Black outline rim behind the impact dot for legibility.</summary>
+        public static SKPaint LocalImpactOutline { get; } = MakeFillPaint(0, 0, 0, 160);
 
         #endregion
 
@@ -157,6 +220,10 @@ namespace eft_dma_radar.Silk.UI.ESP
         public static SKPaint BoxDefault { get; } = MakeBoxPaint(200, 200, 200);
         public static SKPaint TextDefault { get; } = MakeFillPaint(200, 200, 200);
 
+        // Corpse — muted grey, distinct from all live player-type colors
+        public static SKPaint BoxCorpse  { get; } = MakeBoxPaint(160, 160, 160, 200);
+        public static SKPaint TextCorpse { get; } = MakeFillPaint(180, 180, 180, 210);
+
         #endregion
 
         #region Bones
@@ -188,9 +255,19 @@ namespace eft_dma_radar.Silk.UI.ESP
         public static SKPaint TextCatAmmo      { get; } = MakeFillPaint(255, 160,  60, 240); // orange
         public static SKPaint TextCatWeapon    { get; } = MakeFillPaint(255,  90,  60, 240); // red-orange
         public static SKPaint TextCatWeaponMod { get; } = MakeFillPaint(255, 190, 120, 240); // peach
-        public static SKPaint TextCatBackpack  { get; } = MakeFillPaint(100, 185, 255, 240); // sky blue
-        public static SKPaint TextCatCurrency  { get; } = MakeFillPaint(255, 215,  50, 240); // gold
-        public static SKPaint TextCatBarter    { get; } = MakeFillPaint(205, 180, 135, 240); // tan
+        public static SKPaint TextCatBackpack   { get; } = MakeFillPaint(100, 185, 255, 240); // sky blue
+        public static SKPaint TextCatCurrency   { get; } = MakeFillPaint(255, 215,  50, 240); // gold
+        public static SKPaint TextCatBarter     { get; } = MakeFillPaint(205, 180, 135, 240); // tan
+        public static SKPaint TextCatContainer       { get; } = MakeFillPaint(100, 200, 220, 230); // teal — matches radar PaintContainer
+        public static SKPaint TextCatContainerDimmed { get; } = MakeFillPaint(100, 200, 220,  70); // teal at ~30% alpha for searched containers
+
+        #endregion
+
+        #region Exfil Status
+
+        public static SKPaint TextExfilOpen    { get; } = MakeFillPaint(  0, 220,  80, 240); // green
+        public static SKPaint TextExfilPending { get; } = MakeFillPaint(255, 200,   0, 240); // yellow
+        public static SKPaint TextExfilClosed  { get; } = MakeFillPaint(220,  60,  60, 240); // red
 
         #endregion
 

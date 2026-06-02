@@ -14,7 +14,7 @@ namespace eft_dma_radar.Silk.UI.Panels
         public static bool IsOpen { get; set; } = false;
 
         private static readonly IReadOnlyList<string> _fontNames =
-            ["Regular (12 px)", "Consolas (11 px)", "Cutive Mono (14 px)"];
+            ["Segoe UI (12 px)", "Arial (11 px)", "Tahoma (11 px)", "Courier New (11 px)"];
 
         private static readonly IReadOnlyList<string> _boxStyles =
             ["Corners", "Full", "Top + Bottom"];
@@ -34,6 +34,8 @@ namespace eft_dma_radar.Silk.UI.Panels
             if (!IsOpen) return;
             bool isOpen = IsOpen;
             using var scope = PanelWindow.Begin("ESP Visuals", ref isOpen, new Vector2(480, 520));
+            if (!isOpen && IsOpen)
+                ImGui.CloseCurrentPopup(); // flush any dangling combo/color popup before the window closes
             IsOpen = isOpen;
             if (!scope.Visible) return;
 
@@ -42,13 +44,17 @@ namespace eft_dma_radar.Silk.UI.Panels
                 try
                 {
                     if (ImGui.BeginTabItem("Players"))
-                        { try { DrawPlayersTab();    } finally { ImGui.EndTabItem(); } }
+                        { try { ImGui.PushID("players_tab"); DrawPlayersTab(); } finally { ImGui.PopID(); ImGui.EndTabItem(); } }
                     if (ImGui.BeginTabItem("Box"))
-                        { try { DrawBoxTab();        } finally { ImGui.EndTabItem(); } }
-                    if (ImGui.BeginTabItem("Indicators"))
-                        { try { DrawIndicatorsTab(); } finally { ImGui.EndTabItem(); } }
+                        { try { ImGui.PushID("box_tab"); DrawBoxTab(); } finally { ImGui.PopID(); ImGui.EndTabItem(); } }
+                    if (ImGui.BeginTabItem("Labels"))
+                        { try { ImGui.PushID("labels_tab"); DrawLabelsTab(); } finally { ImGui.PopID(); ImGui.EndTabItem(); } }
+                    if (ImGui.BeginTabItem("Loot"))
+                        { try { ImGui.PushID("loot_tab"); DrawLootTab(); } finally { ImGui.PopID(); ImGui.EndTabItem(); } }
+                    if (ImGui.BeginTabItem("Ballistics"))
+                        { try { ImGui.PushID("ballistics_tab"); DrawBallisticsTab(); } finally { ImGui.PopID(); ImGui.EndTabItem(); } }
                     if (ImGui.BeginTabItem("Window"))
-                        { try { DrawWindowTab();     } finally { ImGui.EndTabItem(); } }
+                        { try { ImGui.PushID("window_tab"); DrawWindowTab(); } finally { ImGui.PopID(); ImGui.EndTabItem(); } }
                 }
                 finally
                 {
@@ -105,9 +111,9 @@ namespace eft_dma_radar.Silk.UI.Panels
             { Config.EspPlayerDistance = d; Config.MarkDirty(); }
         }
 
-        // ── Indicators tab ────────────────────────────────────────────────────────
+        // ── Labels tab ────────────────────────────────────────────────────────────
 
-        private static void DrawIndicatorsTab()
+        private static void DrawLabelsTab()
         {
             SectionHeader("Settings");
 
@@ -165,6 +171,59 @@ namespace eft_dma_radar.Silk.UI.Panels
             ImGui.SetNextItemWidth(-1);
             if (ImGui.SliderFloat("##th", ref th, 0.5f, 5f, "%.1f px"))
             { Config.EspBoxThickness = th; Config.MarkDirty(); }
+        }
+
+        // ── Loot tab ──────────────────────────────────────────────────────────────
+
+        private static void DrawLootTab()
+        {
+            SectionHeader("Corpse Boxes");
+
+            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.5f, 0.55f, 0.6f, 1f));
+            ImGui.TextUnformatted("Toggle: Settings → ESP → Corpses");
+            ImGui.PopStyleColor();
+
+            ImGui.PushID("corpses");
+            uint corpseClr = Config.EspCorpseBoxColor;
+            if (ColorOnlyRow("Box Color", ref corpseClr, "Corpse bounding box outline and name label color"))
+            { Config.EspCorpseBoxColor = corpseClr; Config.MarkDirty(); }
+            ImGui.PopID();
+
+            SectionHeader("Backpack Boxes");
+
+            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.5f, 0.55f, 0.6f, 1f));
+            ImGui.TextUnformatted("Toggle: Settings → ESP → Backpacks");
+            ImGui.PopStyleColor();
+
+            ImGui.PushID("backpacks");
+            uint bpClr = Config.EspBackpackBoxColor;
+            if (ColorOnlyRow("Box Color", ref bpClr, "Backpack bounding box outline and name label color"))
+            { Config.EspBackpackBoxColor = bpClr; Config.MarkDirty(); }
+            ImGui.PopID();
+
+            SectionHeader("Containers");
+
+            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.5f, 0.55f, 0.6f, 1f));
+            ImGui.TextUnformatted("Toggle: Settings → ESP → Containers");
+            ImGui.PopStyleColor();
+        }
+
+        // ── Ballistics tab ────────────────────────────────────────────────────────
+
+        private static void DrawBallisticsTab()
+        {
+            var bcfg = Config.Ballistics ??= new();
+
+            SectionHeader("Local Player Trails");
+
+            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.5f, 0.55f, 0.6f, 1f));
+            ImGui.TextUnformatted("Toggles: Settings → ESP → Ballistics");
+            ImGui.PopStyleColor();
+
+            uint hitCol = bcfg.LocalShotHitColor;
+            if (ColorOnlyRow("Hit Trail Color", ref hitCol,
+                "Color applied to your bullet trail the moment it hits something (wall, enemy, floor).\nSet alpha to 0 to keep the trail at the highlight color instead."))
+            { bcfg.LocalShotHitColor = hitCol; Config.MarkDirty(); }
         }
 
         // ── Window tab ────────────────────────────────────────────────────────────

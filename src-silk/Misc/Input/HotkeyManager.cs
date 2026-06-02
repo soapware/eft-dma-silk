@@ -101,7 +101,7 @@ internal static class HotkeyManager
             static e => { if (e.IsDown) eft_dma_radar.Silk.UI.ESP.EspWindow.Toggle(); }),
 
         new("EspCycleRenderMode", "Cycle ESP Render Mode", "ESP",
-            "Cycle player render mode: None → Bones → Box → HeadDot",
+            "Cycle player render mode: None → Bones → Box → HeadDot → Skeleton + HeadDot",
             static e => { if (e.IsDown) eft_dma_radar.Silk.UI.ESP.EspWindow.CycleRenderMode(); }),
 
         new("EspToggleCrosshair", "Toggle ESP Crosshair", "ESP",

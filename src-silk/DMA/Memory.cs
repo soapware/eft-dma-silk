@@ -61,6 +61,8 @@ namespace eft_dma_radar.Silk.DMA
         #region Public State
 
         public static MemoryState State => _state;
+        /// <summary>Tarkov process ID, or 0 if not connected.</summary>
+        public static uint Pid => _pid;
         /// <summary>The active VMM handle, or <see langword="null"/> if not yet initialized.</summary>
         internal static Vmm? VmmHandle => _vmm;
         public static ulong UnityBase { get; private set; }
@@ -118,10 +120,26 @@ namespace eft_dma_radar.Silk.DMA
         /// <summary>Raised when the player leaves the hideout.</summary>
         public static event EventHandler<EventArgs>? HideoutExited;
 
+        private static string[]? BuildStatusLines()
+        {
+            if (!Ready) return null;
+            string faultLine = DmaStats.FaultCount > 0
+                ? $"[!] Faults {DmaStats.FaultCount,-6}  Prepared/s {DmaStats.PreparedPerSecond,-10}"
+                : $"    Faults {0,-6}  Prepared/s {DmaStats.PreparedPerSecond,-10}";
+            return [
+                $"EFT {GameVersion,-15}  PID {Pid}",
+                DiagnosticStatus,
+                $"Throughput {DmaStats.ReadMBpsCurrent,6:0.0} MB/s  Peak {DmaStats.ReadMBpsPeak,6:0.0}  Max {DmaStats.MaxThroughputMBps,6:0.0}",
+                $"DMA {DmaStats.RealtimeFps,4} fps  Entities {DmaStats.EntityCount,4}  Trips/s {DmaStats.TripsPerSecond,7}",
+                faultLine,
+            ];
+        }
+
         private static void OnGameStarted()
         {
             SetState(MemoryState.ProcessFound);
             GCSettings.LatencyMode = GCLatencyMode.SustainedLowLatency;
+            StartupConsole.GetLiveStats = BuildStatusLines;
             LobbyQuestReader.Start();
             eft_dma_radar.Silk.Tarkov.QuestPlanner.QuestPlannerWorker.Start();
             GameStarted?.Invoke(null, EventArgs.Empty);
@@ -129,6 +147,7 @@ namespace eft_dma_radar.Silk.DMA
 
         private static void OnGameStopped()
         {
+            StartupConsole.GetLiveStats = null;
             SetState(MemoryState.WaitingForProcess);
             GCSettings.LatencyMode = GCLatencyMode.Interactive;
             UnityBase = default;
@@ -523,7 +542,7 @@ namespace eft_dma_radar.Silk.DMA
                         {
                             if (i == 0)
                                 Log.WriteLine("[Memory] Process found, waiting for modules...");
-                            Thread.Sleep(1000);
+                            Thread.Sleep(200); // reduced from 1000ms; modules are loaded for mid-raid launches
                         }
                     }
 
@@ -885,6 +904,10 @@ namespace eft_dma_radar.Silk.DMA
                     Log.WriteLine("[Memory] Waiting for IL2CPP TypeInfoTable to initialize...");
                     logged = true;
                 }
+
+                int elapsed = (int)(sw.ElapsedMilliseconds / 1000);
+                StartupConsole.PrintStep("Offsets",
+                    $"Waiting for IL2CPP runtime... ({elapsed}s)", StepState.Pending);
 
                 Thread.Sleep(intervalMs);
             }

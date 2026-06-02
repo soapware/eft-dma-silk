@@ -1,8 +1,9 @@
-﻿// Copyright (c) 2025 HuiTeab.
+// Copyright (c) 2025 HuiTeab.
 // Licensed under the PolyForm Noncommercial License 1.0.0.
 // See LICENSE in the repository root for details.
 
 using System.Runtime.CompilerServices;
+using eft_dma_radar.Silk.Tarkov.GameWorld.Exits;
 using eft_dma_radar.Silk.Tarkov.GameWorld.Interactables;
 using eft_dma_radar.Silk.Tarkov.GameWorld.Player;
 using eft_dma_radar.Silk.Tarkov.Unity;
@@ -74,8 +75,37 @@ namespace eft_dma_radar.Silk.UI.ESP
         private static readonly SKPaint _dynFill   = new() { Style = SKPaintStyle.Fill,   IsAntialias = true };
         private static readonly SKPaint _dynStroke = new() { Style = SKPaintStyle.Stroke, IsAntialias = true, StrokeWidth = 1.5f };
 
+        // Text outline paint — used instead of shadow when EspTextOutline is on.
+        private static readonly SKPaint _outlinePaint = new()
+        {
+            Style = SKPaintStyle.Stroke,
+            StrokeJoin = SKStrokeJoin.Round,
+            StrokeCap  = SKStrokeCap.Round,
+            IsAntialias = true,
+            Color = new SKColor(0, 0, 0, 200),
+        };
+
         private static SKColor ToSKColor(uint argb) =>
             new((byte)(argb >> 16), (byte)(argb >> 8), (byte)argb, (byte)(argb >> 24));
+
+        /// <summary>
+        /// Draws text with either a stroke outline (when <c>EspTextOutline</c> is on) or
+        /// a classic +1/+1 drop shadow. Centralises the per-draw legibility pass.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void DrawLabel(SKCanvas canvas, string text, float x, float y, SKFont font, SKPaint fill)
+        {
+            if (Config.EspTextOutline)
+            {
+                _outlinePaint.StrokeWidth = Config.EspTextOutlineWidth;
+                canvas.DrawText(text, x, y, font, _outlinePaint);
+            }
+            else
+            {
+                canvas.DrawText(text, x + 1, y + 1, font, EspPaints.TextShadow);
+            }
+            canvas.DrawText(text, x, y, font, fill);
+        }
 
         // ── Win32 layered-window opacity ─────────────────────────────────────────
         [DllImport("user32.dll", SetLastError = true)]
@@ -105,9 +135,10 @@ namespace eft_dma_radar.Silk.UI.ESP
 
         private static SKFont NameFont => Config.EspNameFontIdx switch
         {
-            1 => EspPaints.FontBar,    // Consolas 11px
-            2 => EspPaints.FontStatus, // CutiveMono 14px
-            _ => EspPaints.FontName,   // Regular 12px (default)
+            1 => EspPaints.FontArial,      // Arial 11px — Cyrillic ✓
+            2 => EspPaints.FontTahoma,     // Tahoma 11px — Cyrillic ✓
+            3 => EspPaints.FontCourierNew, // Courier New 11px — Cyrillic ✓, monospace
+            _ => EspPaints.FontName,       // Segoe UI 12px — Cyrillic ✓ (default)
         };
 
         #endregion
@@ -509,10 +540,12 @@ namespace eft_dma_radar.Silk.UI.ESP
                 var canvas = _skSurface.Canvas;
                 canvas.Clear(SKColors.Black);
 
+                EspPaints.SetScale(Config.EspTextScale); // no-op when unchanged
+
                 var localPlayer = Memory.LocalPlayer;
                 var allPlayers = Memory.Players;
 
-                if (!Memory.InRaid || localPlayer is null || !CameraManager.IsActive)
+                if ((!Memory.InRaid && !Memory.InHideout) || localPlayer is null || !CameraManager.IsActive)
                 {
                     DrawCenteredText(canvas, "Waiting for Raid");
                 }
@@ -601,10 +634,9 @@ namespace eft_dma_radar.Silk.UI.ESP
             {
                 float tx0 = panelX + PadX;
                 float ty0 = panelY + PadY + LineHeight - 3f;
-                canvas.DrawText(EmptyText, tx0 + 1, ty0 + 1, SKPaints.FontKillfeed, SKPaints.TextShadow);
                 var scratch0 = SKPaints.KillfeedTextScratch;
                 scratch0.Color = SKPaints.TextScav.Color.WithAlpha(180);
-                canvas.DrawText(EmptyText, tx0, ty0, SKPaints.FontKillfeed, scratch0);
+                DrawLabel(canvas, EmptyText, tx0, ty0, SKPaints.FontKillfeed, scratch0);
                 return;
             }
 
@@ -629,9 +661,8 @@ namespace eft_dma_radar.Silk.UI.ESP
                 float ty = panelY + PadY + LineHeight * i + LineHeight - 3f;
                 string display = entry.FormatDisplay();
 
-                canvas.DrawText(display, tx + 1, ty + 1, SKPaints.FontKillfeed, SKPaints.TextShadow);
                 scratch.Color = textPaint.Color.WithAlpha((byte)(alpha * 255f));
-                canvas.DrawText(display, tx, ty, SKPaints.FontKillfeed, scratch);
+                DrawLabel(canvas, display, tx, ty, SKPaints.FontKillfeed, scratch);
             }
         }
 
@@ -671,6 +702,94 @@ namespace eft_dma_radar.Silk.UI.ESP
                 }
             }
 
+            // Corpses — project a horizontal disc around the ragdoll root to get a screen-fitted box
+            if (Config.EspShowCorpses)
+            {
+                var corpses = Memory.Corpses;
+                if (corpses is not null)
+                {
+                    float maxCDist = MathF.Min(Config.EspCorpseDistance, MaxSaneDistance);
+                    float maxCDistSq = maxCDist * maxCDist;
+                    _dynStroke.StrokeWidth = Math.Clamp(Config.EspBoxThickness, 0.5f, 6f);
+
+                    int corpseMode = Config.EspLootedCorpseMode;
+                    foreach (var corpse in corpses)
+                    {
+                        var cPos = corpse.Position;
+                        if (!IsFinite(cPos) || cPos.LengthSquared() < 1f) continue;
+                        if (Vector3.DistanceSquared(localPos, cPos) > maxCDistSq) continue;
+
+                        bool looted = corpse.GearReady && corpse.TotalValue <= 0;
+                        if (looted && corpseMode == 2) continue; // hide
+
+                        var box = ProjectGroundBoundingBox(cPos, 0.7f, 0.8f);
+                        if (box is null) continue;
+
+                        uint corpseColor = Config.EspCorpseBoxColor;
+                        if (looted && corpseMode == 1)
+                        {
+                            // Dim to ~30% alpha
+                            byte a = (byte)((corpseColor >> 24) * 0.30f);
+                            corpseColor = (corpseColor & 0x00FFFFFFu) | ((uint)a << 24);
+                        }
+                        _dynStroke.Color = ToSKColor(corpseColor);
+                        _dynFill.Color   = ToSKColor(corpseColor);
+                        DrawBox(canvas, box.Value, _dynStroke);
+
+                        float dist = Vector3.Distance(localPos, cPos);
+                        string cName = corpse.Name;
+                        if (!string.IsNullOrEmpty(cName))
+                        {
+                            string label = corpse.TotalValue > 0 
+                                ? $"{cName} [{(int)dist}m] [{(corpse.TotalValue / 1000f):0}k]"
+                                : $"{cName} [{(int)dist}m]";
+                            float lw = EspPaints.FontInfo.MeasureText(label);
+                            float lx = box.Value.Left + box.Value.Width * 0.5f - lw * 0.5f;
+                            float ly = box.Value.Top - 4f;
+                            DrawLabel(canvas, label, lx, ly, EspPaints.FontInfo, _dynFill);
+                        }
+                    }
+                }
+            }
+
+            // Backpacks — same disc approach, smaller radius
+            if (Config.EspShowBackpacks)
+            {
+                var loot = Memory.Loot;
+                if (loot is not null)
+                {
+                    float maxBDist = MathF.Min(Config.EspBackpackDistance, MaxSaneDistance);
+                    float maxBDistSq = maxBDist * maxBDist;
+                    _dynStroke.StrokeWidth = Math.Clamp(Config.EspBoxThickness, 0.5f, 6f);
+
+                    foreach (var item in loot)
+                    {
+                        if (!item.MarketItem.IsBackpack) continue;
+                        var bPos = item.Position;
+                        if (!IsFinite(bPos) || bPos.LengthSquared() < 1f) continue;
+                        if (Vector3.DistanceSquared(localPos, bPos) > maxBDistSq) continue;
+
+                        var box = ProjectGroundBoundingBox(bPos, 0.3f, 0.35f);
+                        if (box is null) continue;
+
+                        _dynStroke.Color = ToSKColor(Config.EspBackpackBoxColor);
+                        _dynFill.Color   = ToSKColor(Config.EspBackpackBoxColor);
+                        DrawBox(canvas, box.Value, _dynStroke);
+
+                        float dist = Vector3.Distance(localPos, bPos);
+                        string bName = item.MarketItem.ShortName ?? item.MarketItem.Name ?? "Backpack";
+                        if (!string.IsNullOrEmpty(bName))
+                        {
+                            string label = $"{bName} [{(int)dist}m]";
+                            float lw = EspPaints.FontInfo.MeasureText(label);
+                            float lx = box.Value.Left + box.Value.Width * 0.5f - lw * 0.5f;
+                            float ly = box.Value.Top - 4f;
+                            DrawLabel(canvas, label, lx, ly, EspPaints.FontInfo, _dynFill);
+                        }
+                    }
+                }
+            }
+
             // Key-held locked doors
             if (Config.ShowKeyDoors)
             {
@@ -691,8 +810,43 @@ namespace eft_dma_radar.Silk.UI.ESP
                         float ly = sp.Y - 10f;
 
                         canvas.DrawCircle(sp.X, sp.Y, 4f, EspPaints.TextKeyDoor);
-                        canvas.DrawText(label, lx + 1, ly + 1, EspPaints.FontInfo, EspPaints.TextShadow);
-                        canvas.DrawText(label, lx, ly, EspPaints.FontInfo, EspPaints.TextKeyDoor);
+                        DrawLabel(canvas, label, lx, ly, EspPaints.FontInfo, EspPaints.TextKeyDoor);
+                    }
+                }
+            }
+
+            // Containers
+            if (Config.EspShowContainers)
+            {
+                var containers = Memory.Containers;
+                if (containers is not null)
+                {
+                    float maxCDist   = Math.Min(Config.EspContainerDistance, MaxSaneDistance);
+                    float maxCDistSq = maxCDist * maxCDist;
+
+                    int containerMode = Config.EspSearchedContainerMode;
+                    foreach (var container in containers)
+                    {
+                        var cPos = container.Position;
+                        if (!IsFinite(cPos) || cPos.LengthSquared() < 1f) continue;
+                        if (Vector3.DistanceSquared(localPos, cPos) > maxCDistSq) continue;
+
+                        if (container.Searched && containerMode == 2) continue; // hide
+
+                        if (!CameraManager.WorldToScreen(ref cPos, out var sp, onScreenCheck: false, useTolerance: false)) continue;
+
+                        var paint = (container.Searched && containerMode == 1)
+                            ? EspPaints.TextCatContainerDimmed
+                            : EspPaints.TextCatContainer;
+
+                        float dist  = Vector3.Distance(localPos, container.Position);
+                        string label = $"{container.Name} [{(int)dist}m]";
+                        const float cDotR = 4f;
+                        float lx = sp.X + cDotR + 4f;
+                        float ly = sp.Y + EspPaints.FontLoot.Size * 0.35f;
+
+                        DrawLabel(canvas, label, lx, ly, EspPaints.FontLoot, paint);
+                        canvas.DrawCircle(sp.X, sp.Y, cDotR, paint);
                     }
                 }
             }
@@ -709,7 +863,7 @@ namespace eft_dma_radar.Silk.UI.ESP
                     {
                         int price = item.DisplayPrice;
                         var result = item.Evaluate(price);
-                        if (!result.Visible)
+                        if (Config.EspLootWishlistOnly ? !result.Wishlisted : !result.Visible)
                             continue;
 
                         var iPos = item.Position;
@@ -725,6 +879,41 @@ namespace eft_dma_radar.Silk.UI.ESP
                 }
             }
 
+            // Exfil points
+            if (Config.EspShowExfils)
+            {
+                var exfils = Memory.Exfils;
+                if (exfils is not null)
+                {
+                    var lp = localPlayer as LocalPlayer;
+                    foreach (var exfil in exfils)
+                    {
+                        if (lp is not null && !exfil.IsEligibleFor(lp)) continue;
+
+                        var ePos = exfil.Position;
+                        if (!IsFinite(ePos)) continue;
+                        if (!CameraManager.WorldToScreen(ref ePos, out var sp, onScreenCheck: false, useTolerance: false)) continue;
+
+                        var textPaint = exfil.Status switch
+                        {
+                            ExfilStatus.Open    => EspPaints.TextExfilOpen,
+                            ExfilStatus.Pending => EspPaints.TextExfilPending,
+                            _                   => EspPaints.TextExfilClosed,
+                        };
+
+                        float dist  = Vector3.Distance(localPos, exfil.Position);
+                        string label = $"{exfil.Name} [{(int)dist}m]";
+                        const float dotR = 5f;
+                        const float gap  = 4f;
+                        float lx = sp.X + dotR + gap;
+                        float ly = sp.Y + EspPaints.FontLoot.Size * 0.35f; // vertically centre on dot
+
+                        canvas.DrawCircle(sp.X, sp.Y, dotR, textPaint);
+                        DrawLabel(canvas, label, lx, ly, EspPaints.FontLoot, textPaint);
+                    }
+                }
+            }
+
             // Ballistics overlay — predicted trajectory + live shot trails.
             try { BallisticsRenderer.Draw(canvas); }
             catch (Exception ex)
@@ -734,9 +923,49 @@ namespace eft_dma_radar.Silk.UI.ESP
             }
         }
 
+        private static readonly float[] CosTable = new float[8]
+        {
+            1.0f, 0.70710678f, 0.0f, -0.70710678f, -1.0f, -0.70710678f, 0.0f, 0.70710678f
+        };
+        private static readonly float[] SinTable = new float[8]
+        {
+            0.0f, 0.70710678f, 1.0f, 0.70710678f, 0.0f, -0.70710678f, -1.0f, -0.70710678f
+        };
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool IsFinite(Vector3 v) =>
             float.IsFinite(v.X) && float.IsFinite(v.Y) && float.IsFinite(v.Z);
+
+        /// <summary>
+        /// Projects a horizontal disc (8 cardinal/diagonal points × 2 heights) around
+        /// <paramref name="center"/> and returns the screen-space bounding rect.
+        /// Returns null if fewer than 4 points land in front of the camera (entity too far / behind camera).
+        /// Produces a wider-than-tall box for prone bodies viewed from eye level.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static SKRect? ProjectGroundBoundingBox(Vector3 center, float radius, float bodyHeight)
+        {
+            float minX = float.MaxValue, minY = float.MaxValue;
+            float maxX = float.MinValue, maxY = float.MinValue;
+            int hits = 0;
+            for (int i = 0; i < 8; i++)
+            {
+                float dx = CosTable[i] * radius;
+                float dz = SinTable[i] * radius;
+                for (int j = 0; j < 2; j++)
+                {
+                    var pt = new Vector3(center.X + dx, center.Y + j * bodyHeight, center.Z + dz);
+                    if (!CameraManager.WorldToScreen(ref pt, out var scr, onScreenCheck: false)) continue;
+                    if (scr.X < minX) minX = scr.X;
+                    if (scr.X > maxX) maxX = scr.X;
+                    if (scr.Y < minY) minY = scr.Y;
+                    if (scr.Y > maxY) maxY = scr.Y;
+                    hits++;
+                }
+            }
+            if (hits < 4 || maxX - minX < 4f) return null;
+            return new SKRect(minX, minY, maxX, maxY);
+        }
 
         /// <summary>
         /// Draws a single player with box, name, distance, and health bar.
@@ -823,8 +1052,8 @@ namespace eft_dma_radar.Silk.UI.ESP
 
             int mode = Config.EspRenderMode;
             bool drawBox = mode == 2 && boxHeight >= MinBoxHeight;
-            bool drawBones = (mode == 1 || (mode == 2 && Config.EspShowBones)) && haveSkeleton;
-            bool drawHeadDot = mode == 3 || (mode == 2 && boxHeight < MinBoxHeight);
+            bool drawBones = (mode == 1 || (mode == 2 && Config.EspShowBones) || mode == 4) && haveSkeleton;
+            bool drawHeadDot = mode == 3 || mode == 4 || (mode == 2 && boxHeight < MinBoxHeight);
 
             SKRect box = default;
             if (drawBox)
@@ -850,7 +1079,12 @@ namespace eft_dma_radar.Silk.UI.ESP
             }
             else if (drawHeadDot)
             {
-                canvas.DrawCircle(centerX, topY, 3f, boxPaint);
+                // Use the exact head bone screen position when skeleton data is available so
+                // the dot tracks the head bone rather than the box center-X (which averages
+                // head and feet X and drifts when feet move independently of the head).
+                float dotX = haveSkeleton ? headScreen.X : centerX;
+                float dotY = haveSkeleton ? headScreen.Y : topY;
+                canvas.DrawCircle(dotX, dotY, 3f, boxPaint);
             }
 
             if (drawBones)
@@ -865,8 +1099,7 @@ namespace eft_dma_radar.Silk.UI.ESP
                 float nameWidth = nameFont.MeasureText(name);
                 float nameX = centerX - nameWidth * 0.5f;
                 float nameY = topY - 4f;
-                canvas.DrawText(name, nameX + 1, nameY + 1, nameFont, EspPaints.TextShadow);
-                canvas.DrawText(name, nameX, nameY, nameFont, _dynFill);
+                DrawLabel(canvas, name, nameX, nameY, nameFont, _dynFill);
             }
 
             float distY = bottomY + EspPaints.FontInfo.Size + 2f;
@@ -876,8 +1109,7 @@ namespace eft_dma_radar.Silk.UI.ESP
                 string distText = $"{(int)distance}m";
                 float distWidth = EspPaints.FontInfo.MeasureText(distText);
                 float distX = centerX - distWidth * 0.5f;
-                canvas.DrawText(distText, distX + 1, distY + 1, EspPaints.FontInfo, EspPaints.TextShadow);
-                canvas.DrawText(distText, distX, distY, EspPaints.FontInfo, _dynFill);
+                DrawLabel(canvas, distText, distX, distY, EspPaints.FontInfo, _dynFill);
             }
 
             // Weapon label (below distance)
@@ -889,8 +1121,7 @@ namespace eft_dma_radar.Silk.UI.ESP
                     _dynFill.Color = ToSKColor(Config.EspWeaponColor);
                     float ww = EspPaints.FontInfo.MeasureText(weapon);
                     float wy = distY + EspPaints.FontInfo.Size + 2f;
-                    canvas.DrawText(weapon, centerX - ww * 0.5f + 1, wy + 1, EspPaints.FontInfo, EspPaints.TextShadow);
-                    canvas.DrawText(weapon, centerX - ww * 0.5f,     wy,     EspPaints.FontInfo, _dynFill);
+                    DrawLabel(canvas, weapon, centerX - ww * 0.5f, wy, EspPaints.FontInfo, _dynFill);
                 }
             }
         }
@@ -1073,8 +1304,7 @@ namespace eft_dma_radar.Silk.UI.ESP
             float lx = screenPos.X - labelWidth / 2f;
             float ly = screenPos.Y;
 
-            canvas.DrawText(label, lx + 1, ly + 1, EspPaints.FontLoot, EspPaints.TextShadow);
-            canvas.DrawText(label, lx, ly, EspPaints.FontLoot, textPaint);
+            DrawLabel(canvas, label, lx, ly, EspPaints.FontLoot, textPaint);
         }
 
         #endregion
@@ -1099,8 +1329,7 @@ namespace eft_dma_radar.Silk.UI.ESP
         {
             var size = _window!.Size;
             float textWidth = SKPaints.FontBanner.MeasureText(text);
-            // ~5% of window width ≈ 1 inch at typical resolutions; scales with window size
-            float rightMargin = size.X * 0.05f;
+            float rightMargin = size.X * 0.09f;
             float x = size.X - textWidth - rightMargin;
             float y = 37f;
             canvas.DrawText(text, x, y, SKPaints.FontBanner, SKPaints.TextRadarStatus);
@@ -1109,8 +1338,7 @@ namespace eft_dma_radar.Silk.UI.ESP
         private static void DrawFpsOverlay(SKCanvas canvas)
         {
             string fpsText = $"{_fps} FPS";
-            canvas.DrawText(fpsText, 7, 17, EspPaints.FontInfo, EspPaints.TextShadow);
-            canvas.DrawText(fpsText, 6, 16, EspPaints.FontInfo, EspPaints.TextBar);
+            DrawLabel(canvas, fpsText, 6, 16, EspPaints.FontInfo, EspPaints.TextBar);
         }
 
         /// <summary>
@@ -1176,8 +1404,7 @@ namespace eft_dma_radar.Silk.UI.ESP
             float x = (size.X - textWidth) * 0.5f;
             float y = EspPaints.FontStatus.Size + 4f;
 
-            canvas.DrawText(text, x + 1, y + 1, EspPaints.FontStatus, EspPaints.TextShadow);
-            canvas.DrawText(text, x, y, EspPaints.FontStatus, EspPaints.TextStatus);
+            DrawLabel(canvas, text, x, y, EspPaints.FontStatus, EspPaints.TextStatus);
         }
 
         private static string? BuildStatusText()
@@ -1235,16 +1462,15 @@ namespace eft_dma_radar.Silk.UI.ESP
             float tw = EspPaints.FontBar.MeasureText(text);
             float tx = x + (w - tw) * 0.5f;
             float ty = y + h * 0.5f + EspPaints.FontBar.Size / 3f;
-            canvas.DrawText(text, tx + 1, ty + 1, EspPaints.FontBar, EspPaints.TextShadow);
-            canvas.DrawText(text, tx, ty, EspPaints.FontBar, EspPaints.TextBar);
+            DrawLabel(canvas, text, tx, ty, EspPaints.FontBar, EspPaints.TextBar);
         }
 
         /// <summary>
-        /// Cycles <see cref="SilkConfig.EspRenderMode"/> through 0 → 1 → 2 → 3 → 0.
+        /// Cycles <see cref="SilkConfig.EspRenderMode"/> through 0 → 1 → 2 → 3 → 4 → 0.
         /// </summary>
         public static void CycleRenderMode()
         {
-            Config.EspRenderMode = (Config.EspRenderMode + 1) % 4;
+            Config.EspRenderMode = (Config.EspRenderMode + 1) % 5;
             Config.MarkDirty();
         }
 

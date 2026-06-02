@@ -798,7 +798,14 @@ namespace eft_dma_radar.Silk.UI
                 HideoutPanel.Draw();
 
             if (EspCustomizationPanel.IsOpen)
-                EspCustomizationPanel.Draw();
+            {
+                try { EspCustomizationPanel.Draw(); }
+                catch (Exception ex)
+                {
+                    Log.Write(AppLogLevel.Error, $"[EspCustomizationPanel] Draw exception: {ex.Message}");
+                    EspCustomizationPanel.IsOpen = false;
+                }
+            }
 
             // Right-dock layout (Players / Loot / Quests) — must be initialized
             // BEFORE those panels' Draw() is called so SetNextWindowPos/Size land.

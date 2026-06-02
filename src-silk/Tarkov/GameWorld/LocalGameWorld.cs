@@ -2,6 +2,7 @@
 // Licensed under the PolyForm Noncommercial License 1.0.0.
 // See LICENSE in the repository root for details.
 
+using eft_dma_radar.Silk.Misc;
 using eft_dma_radar.Silk.Misc.Workers;
 using eft_dma_radar.Silk.Tarkov.GameWorld.Btr;
 using eft_dma_radar.Silk.Tarkov.GameWorld.Explosives;
@@ -254,6 +255,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
             WaitForCooldown(ct);
 
             var processCheckSw = Stopwatch.StartNew();
+            bool raidSignalled = false; // tracks whether we've updated the Radar slot to "detected"
 
             while (true)
             {
@@ -280,7 +282,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                         Memory.DiagnosticStatus = "Waiting for GameWorld base...";
                         Log.WriteRateLimited(AppLogLevel.Info, "gw_zero", TimeSpan.FromSeconds(10),
                             "[LocalGameWorld] GameWorld not found yet — waiting for raid...");
-                        Thread.Sleep(500);
+                        Thread.Sleep(100); // reduced: poll faster when mid-raid launch
                         continue;
                     }
 
@@ -290,8 +292,16 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                         Memory.DiagnosticStatus = "Discarding stale GameWorld...";
                         Log.WriteRateLimited(AppLogLevel.Info, "gw_stale", TimeSpan.FromSeconds(10),
                             $"[LocalGameWorld] Stale GameWorld @ 0x{gameWorld:X} — waiting for new raid...");
-                        Thread.Sleep(1000);
+                        Thread.Sleep(1000); // intentional: stale guard needs real wait
                         continue;
+                    }
+
+                    // GameWorld is live — update Radar slot once to signal mid-raid detection
+                    if (!raidSignalled)
+                    {
+                        raidSignalled = true;
+                        StartupConsole.PrintStep("Radar", "Raid detected — connecting...", StepState.Pending);
+                        Log.WriteLine("[LocalGameWorld] Active raid detected — running validation checks.");
                     }
 
                     // Validate we are actually in a raid: MainPlayer must be a valid pointer
@@ -301,7 +311,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                         Memory.DiagnosticStatus = "GameWorld found. Waiting for MainPlayer...";
                         Log.WriteRateLimited(AppLogLevel.Info, "gw_search", TimeSpan.FromSeconds(5),
                             "[LocalGameWorld] GameWorld found but no MainPlayer yet — waiting for raid...");
-                        Thread.Sleep(500);
+                        Thread.Sleep(100); // reduced
                         continue;
                     }
 
@@ -314,7 +324,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                         Memory.DiagnosticStatus = "Waiting for player list registration...";
                         Log.WriteRateLimited(AppLogLevel.Info, "gw_noraid", TimeSpan.FromSeconds(5),
                             "[LocalGameWorld] GameWorld found but player list not ready — waiting...");
-                        Thread.Sleep(500);
+                        Thread.Sleep(100); // reduced
                         continue;
                     }
 
@@ -323,7 +333,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                         Memory.DiagnosticStatus = "Validating player skeleton transforms...";
                         Log.WriteRateLimited(AppLogLevel.Info, "gw_stale_xform", TimeSpan.FromSeconds(5),
                             $"[LocalGameWorld] GameWorld @ 0x{gameWorld:X} — transform unreadable. Waiting...");
-                        Thread.Sleep(1000);
+                        Thread.Sleep(150); // reduced
                         continue;
                     }
 
@@ -342,7 +352,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     {
                         Log.WriteRateLimited(AppLogLevel.Debug, "gw_unknown_map", TimeSpan.FromSeconds(10),
                             $"[LocalGameWorld] GameWorld @ 0x{gameWorld:X} has no real LocationId ('{mapId}') — not a raid. Waiting...");
-                        Thread.Sleep(1000);
+                        Thread.Sleep(200); // reduced
                         continue;
                     }
 
@@ -364,7 +374,8 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                     MatchingProgressResolver.NotifyRaidStarted();
 
                     Log.WriteLine($"[LocalGameWorld] Found live GameWorld @ 0x{gameWorld:X}, map = '{mapId}'");
-                    Memory.DiagnosticStatus = "Raid World Found";
+                    Memory.DiagnosticStatus = "Raid Active";
+                    StartupConsole.PrintStep("Radar", $"Raid Active — {mapId}", StepState.Ok);
                     return new LocalGameWorld(gameWorld, mapId, ct);
                 }
                 catch (Memory.GameNotRunningException)
@@ -375,7 +386,7 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld
                 {
                     Log.WriteRateLimited(AppLogLevel.Info, "gw_search", TimeSpan.FromSeconds(5),
                         $"[LocalGameWorld] Waiting for raid... ({ex.Message})");
-                    Thread.Sleep(500);
+                    Thread.Sleep(100); // reduced
                 }
             }
         }

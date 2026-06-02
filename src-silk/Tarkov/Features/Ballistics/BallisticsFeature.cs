@@ -41,6 +41,11 @@ namespace eft_dma_radar.Silk.Tarkov.Features.Ballistics
         /// <summary>Pre-sampled trajectory points for rendering. Length 0 when invalid.</summary>
         public Vector3[] LocalTrajectory { get; private set; } = Array.Empty<Vector3>();
 
+        // Exponential moving average for auto-range — prevents arc length from jumping
+        // every frame as players enter/exit the crosshair zone.
+        private float _smoothedAutoRange = -1f;
+        private int _autoRangeTick = 0;
+
         /// <summary>Loaded ammo's short name (for HUD).</summary>
         public string? CurrentAmmoShortName => Resolver.CurrentAmmoShortName;
 
@@ -69,6 +74,8 @@ namespace eft_dma_radar.Silk.Tarkov.Features.Ballistics
             Resolver.Reset();
             LocalPredicted = null;
             LocalTrajectory = Array.Empty<Vector3>();
+            _smoothedAutoRange = -1f;
+            _autoRangeTick = 0;
         }
 
         public void OnRaidStart()
@@ -114,6 +121,9 @@ namespace eft_dma_radar.Silk.Tarkov.Features.Ballistics
             bool needLiveShots = cfg.DrawLiveShots || cfg.ShowDebugHud;
             bool needPredicted = cfg.DrawPredictedTrajectory || cfg.ShowDebugHud;
 
+            // Always keep LocalPlayerBase current so impact tracking knows who fired.
+            Tracker.LocalPlayerBase = (game.LocalPlayer as LocalPlayer)?.Base ?? 0UL;
+
             // 1) Live shot tracer history from BallisticsCalculator.Shots.
             if (needLiveShots)
                 Tracker.Update(game.Base);
@@ -144,6 +154,48 @@ namespace eft_dma_radar.Silk.Tarkov.Features.Ballistics
 
             int sampleCount = Math.Clamp(cfg.PredictedSamples, 8, 512);
             float maxDist = Math.Clamp(cfg.PredictedMaxDistance, 25f, 2000f);
+
+            if (cfg.AutoRange && game.RegisteredPlayers is { } players)
+            {
+                if (++_autoRangeTick >= 10) // Search for target every 10 ticks (~80ms)
+                {
+                    _autoRangeTick = 0;
+                    const float threshSq = 200f * 200f; // 200 px radius around crosshair
+                    var center = CameraManager.ViewportCenter;
+                    float bestSq = threshSq;
+                    float autoRange = -1f;
+
+                    foreach (var player in players)
+                    {
+                        if (player.IsLocalPlayer || !player.IsAlive) continue;
+                        var head = player.Position with { Y = player.Position.Y + 1.7f };
+                        if (!CameraManager.WorldToScreen(ref head, out var sp, onScreenCheck: true)) continue;
+                        float sq = Vector2.DistanceSquared(center, sp);
+                        if (sq < bestSq)
+                        {
+                            bestSq = sq;
+                            autoRange = Vector3.Distance(lp.Position, player.Position);
+                        }
+                    }
+
+                    if (autoRange > 0f)
+                    {
+                        // EMA smoothing — blend towards new target over ~5 ticks to suppress per-frame jumps
+                        _smoothedAutoRange = _smoothedAutoRange < 0f
+                            ? autoRange
+                            : _smoothedAutoRange * 0.7f + autoRange * 0.3f;
+                    }
+                    else
+                    {
+                        _smoothedAutoRange = -1f; // reset when no target in crosshair
+                    }
+                }
+
+                if (_smoothedAutoRange > 0f)
+                {
+                    maxDist = Math.Clamp(_smoothedAutoRange, 25f, 2000f);
+                }
+            }
             var buffer = new Vector3[sampleCount];
             int written = TrajectoryMath.BuildTrajectoryPoints(shot, buffer, maxDist);
             if (written < 2)

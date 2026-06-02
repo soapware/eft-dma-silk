@@ -34,12 +34,24 @@ namespace eft_dma_radar.Silk.UI
         /// <summary>Consolas — player counter, info sub-lines, monospace readouts.</summary>
         public static SKTypeface Consolas { get; }
 
+        /// <summary>Arial — Cyrillic-capable compact sans-serif for ESP name labels.</summary>
+        public static SKTypeface Arial { get; }
+
+        /// <summary>Tahoma — Cyrillic-capable humanist sans-serif for ESP name labels.</summary>
+        public static SKTypeface Tahoma { get; }
+
+        /// <summary>Courier New — Cyrillic-capable monospace for ESP name labels.</summary>
+        public static SKTypeface CourierNew { get; }
+
         static CustomFonts()
         {
             Regular    = LoadLabelFont();
-            MsGothic   = LoadSystemFont("msgothic.ttc", 0, "MS Gothic", "MS PGothic", "Yu Gothic");
+            MsGothic   = LoadSystemFont("msgothic.ttc", 0, "MS Gothic",    "MS PGothic",      "Yu Gothic");
             CutiveMono = LoadCutiveMono();
-            Consolas   = LoadSystemFont("consola.ttf",  0, "Consolas",  "Courier New", "Lucida Console");
+            Consolas   = LoadSystemFont("consola.ttf",  0, "Consolas",     "Courier New",     "Lucida Console");
+            Arial      = LoadSystemFont("arial.ttf",    0, "Arial",        "Helvetica",       "Segoe UI");
+            Tahoma     = LoadSystemFont("tahoma.ttf",   0, "Tahoma",       "Verdana",         "Microsoft Sans Serif");
+            CourierNew = LoadSystemFont("cour.ttf",     0, "Courier New",  "Lucida Console",  "Consolas");
         }
 
         private static SKTypeface LoadCutiveMono()

@@ -41,7 +41,15 @@ namespace eft_dma_radar.Silk.Misc
         // ── Blink state ───────────────────────────────────────────────────────────
         private static int    _blinkSlot  = -1;   // which slot shows ▌ (-1 = none)
         private static bool   _blinkOn    = false;
+        private static int    _blinkCount = 0;    // total timer ticks; drives stats refresh cadence
         private static Timer? _blinkTimer;
+
+        /// <summary>
+        /// Optional callback returning up to <see cref="TipLines"/> stat strings for the STATUS box.
+        /// When non-null, invoked every ~800 ms by the blink timer (every 2nd tick).
+        /// Return null to leave the STATUS box content unchanged.
+        /// </summary>
+        public static Func<string[]?>? GetLiveStats { get; set; }
 
         // ── Tip box content ───────────────────────────────────────────────────────
         private static string[] _tip = [];
@@ -59,8 +67,8 @@ namespace eft_dma_radar.Silk.Misc
         public static void PrintHeader()
         {
             if (!Log.CleanMode) return;
-            Console.Title = "EFT (Silk.NET) - Console";
-            Console.CursorVisible = false;
+            try { Console.Title = "EFT (Silk.NET) - Console"; } catch {}
+            try { Console.CursorVisible = false; } catch {}
 
             lock (_lock)
             {
@@ -93,13 +101,29 @@ namespace eft_dma_radar.Silk.Misc
                 _tipRow = Console.CursorTop;
                 _tip = [];
                 RenderTipBox();
+                RestoreCursor(); // park cursor below box before any other thread can write
 
-                // Blink timer: 400ms, toggles ▌ on active slot
+                // Blink timer: 400ms, toggles ▌ on active slot + refreshes live stats every 2nd tick
                 _blinkTimer?.Dispose();
                 _blinkTimer = new Timer(_ =>
                 {
                     lock (_lock)
                     {
+                        _blinkCount++;
+
+                        // Live stats refresh every 2 ticks (~800ms)
+                        if (_blinkCount % 2 == 0 && GetLiveStats is { } fn)
+                        {
+                            var lines = fn();
+                            if (lines is not null && _tipRow >= 0)
+                            {
+                                _tip = lines;
+                                try { Console.SetCursorPosition(0, _tipRow); RenderTipBox(); }
+                                catch { }
+                                RestoreCursor();
+                            }
+                        }
+
                         if (_slot0Row < 0 || _blinkSlot < 0) return;
                         try
                         {

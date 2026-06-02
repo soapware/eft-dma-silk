@@ -21,6 +21,23 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Ballistics
         private readonly Dictionary<ulong, LiveShot> _shots = new(MaxConcurrentShots);
         private readonly object _sync = new();
 
+        /// <summary>Impact event — world position where a local-player bullet stopped.</summary>
+        public readonly record struct ImpactEvent(Vector3 Position, DateTime Time);
+
+        // Tracks which shot pointers were active in the previous Update() call.
+        // Single-writer (worker thread) so no lock needed.
+        private readonly HashSet<ulong> _activeLastTick = new();
+
+        // Impact events produced when a local-player shot leaves the active Shots list.
+        private readonly Queue<ImpactEvent> _impacts = new();
+
+        /// <summary>
+        /// Local player's <c>Player.Base</c> address. Set each tick by
+        /// <see cref="eft_dma_radar.Silk.Tarkov.Features.Ballistics.BallisticsFeature"/>
+        /// so the tracker can identify which shots belong to the local player.
+        /// </summary>
+        public ulong LocalPlayerBase { get; set; }
+
         private TimeSpan _lifetime = TimeSpan.FromSeconds(4.5);
         public TimeSpan Lifetime
         {
@@ -40,10 +57,12 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Ballistics
             lock (_sync)
             {
                 _shots.Clear();
+                _impacts.Clear();
                 TrackedCount = 0;
                 LastFireIndex = 0;
                 G1Captured = false;
             }
+            _activeLastTick.Clear();
         }
 
         /// <summary>
@@ -112,6 +131,26 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Ballistics
                 }
             }
 
+            // Detect impacts: shots that were active last tick but aren't this tick.
+            if (LocalPlayerBase != 0)
+            {
+                foreach (var id in _activeLastTick)
+                {
+                    if (seen.Contains(id)) continue;
+                    lock (_sync)
+                    {
+                        if (!_shots.TryGetValue(id, out var shot) || shot.OwnerPlayer != LocalPlayerBase) continue;
+                        if (shot.HitTime == DateTime.MinValue) // record only on first disappearance
+                        {
+                            shot.HitTime = now;
+                            _impacts.Enqueue(new ImpactEvent(shot.CurrentPosition, now));
+                        }
+                    }
+                }
+            }
+            _activeLastTick.Clear();
+            _activeLastTick.UnionWith(seen);
+
             // GC stale shots: not seen this tick AND older than Lifetime.
             lock (_sync)
             {
@@ -126,6 +165,21 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Ballistics
                     foreach (var id in stale) _shots.Remove(id);
                 }
                 TrackedCount = _shots.Count;
+            }
+        }
+
+        /// <summary>
+        /// Returns impact events for the local player's bullets that recently stopped.
+        /// Prunes events older than 1.5 s before returning. Thread-safe.
+        /// </summary>
+        public ImpactEvent[] GetImpactSnapshot()
+        {
+            lock (_sync)
+            {
+                var cutoff = DateTime.UtcNow - TimeSpan.FromSeconds(1.5);
+                while (_impacts.Count > 0 && _impacts.Peek().Time < cutoff)
+                    _impacts.Dequeue();
+                return _impacts.Count == 0 ? Array.Empty<ImpactEvent>() : _impacts.ToArray();
             }
         }
 
@@ -221,11 +275,49 @@ namespace eft_dma_radar.Silk.Tarkov.GameWorld.Ballistics
                         Velocity = s.Velocity,
                         CurrentPosition = s.CurrentPosition,
                         StartPosition = s.StartPosition,
+                        HitTime = s.HitTime,
                     };
                     copy.Trail.AddRange(s.Trail);
                     arr[i++] = copy;
                 }
                 return arr;
+            }
+        }
+
+        /// <summary>
+        /// Executes a callback for every active shot trail under the internal sync lock.
+        /// Completely zero-allocation alternative to GetSnapshot().
+        /// </summary>
+        public void DrawActiveShots<TState>(TState state, Action<LiveShot, TState> drawAction)
+        {
+            lock (_sync)
+            {
+                foreach (var shot in _shots.Values)
+                {
+                    drawAction(shot, state);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Processes and executes a callback for every active bullet impact marker under the lock.
+        /// Removes old events older than 1.5 seconds and passes age to the drawing delegate.
+        /// Completely zero-allocation alternative to GetImpactSnapshot().
+        /// </summary>
+        public void DrawImpactMarkers<TState>(TState state, Action<ImpactEvent, float, TState> drawAction)
+        {
+            lock (_sync)
+            {
+                var now = DateTime.UtcNow;
+                var cutoff = now - TimeSpan.FromSeconds(1.5);
+                while (_impacts.Count > 0 && _impacts.Peek().Time < cutoff)
+                    _impacts.Dequeue();
+
+                foreach (var impact in _impacts)
+                {
+                    float age = (float)(now - impact.Time).TotalSeconds;
+                    drawAction(impact, age, state);
+                }
             }
         }
     }

@@ -103,8 +103,8 @@ namespace eft_dma_radar.Silk.Web
 
             var builder = WebApplication.CreateBuilder();
 
-            builder.Logging.AddFilter("Microsoft", LogLevel.Warning);
-            builder.Logging.AddFilter("Microsoft.Hosting.Lifetime", LogLevel.Information);
+            builder.Logging.AddFilter("Microsoft",                  Log.CleanMode ? LogLevel.None : LogLevel.Warning);
+            builder.Logging.AddFilter("Microsoft.Hosting.Lifetime", Log.CleanMode ? LogLevel.None : LogLevel.Information);
 
             builder.WebHost.ConfigureKestrel(options =>
             {

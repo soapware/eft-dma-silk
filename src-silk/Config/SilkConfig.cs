@@ -149,6 +149,30 @@ namespace eft_dma_radar.Silk.Config
         /// <summary>Max predicted-trajectory distance from muzzle (meters).</summary>
         [JsonPropertyName("predictedMaxDistance")]
         public float PredictedMaxDistance { get; set; } = 400f;
+
+        /// <summary>
+        /// When true, the arc automatically extends to the distance of the enemy player
+        /// closest to the screen centre (within 200 px). Falls back to PredictedMaxDistance
+        /// when no eligible player is in the crosshair zone.
+        /// </summary>
+        [JsonPropertyName("autoRange")]
+        public bool AutoRange { get; set; } = false;
+
+        /// <summary>Draw the local player's bullet trails in a distinct orange/yellow color.</summary>
+        [JsonPropertyName("highlightLocalShotTrail")]
+        public bool HighlightLocalShotTrail { get; set; } = true;
+
+        /// <summary>When true, only the local player's trails are shown; all other tracers are hidden.</summary>
+        [JsonPropertyName("localShotTrailOnly")]
+        public bool LocalShotTrailOnly { get; set; } = false;
+
+        /// <summary>Draw a fading dot where the local player's bullets stop.</summary>
+        [JsonPropertyName("drawShotImpactMarkers")]
+        public bool DrawShotImpactMarkers { get; set; } = true;
+
+        /// <summary>ARGB color applied to the local player's trail after it hits something. 0 = keep trail color.</summary>
+        [JsonPropertyName("localShotHitColor")]
+        public uint LocalShotHitColor { get; set; } = 0xFFFF4040;
     }
 
     /// <summary>
@@ -419,7 +443,7 @@ namespace eft_dma_radar.Silk.Config
 
         /// <summary>
         /// ESP per-player render mode: 0 = None (labels only), 1 = Bones,
-        /// 2 = Box (+ optional bones via <see cref="EspShowBones"/>), 3 = HeadDot.
+        /// 2 = Box (+ optional bones via <see cref="EspShowBones"/>), 3 = HeadDot, 4 = Skeleton + HeadDot.
         /// Cycled by the "Cycle ESP Render Mode" hotkey.
         /// </summary>
         public int EspRenderMode { get; set; } = 2;
@@ -439,6 +463,18 @@ namespace eft_dma_radar.Silk.Config
         /// <summary>Target FPS for the ESP window (independent of the radar FPS).</summary>
         public int EspTargetFps { get; set; } = 144;
 
+        /// <summary>Global scale multiplier applied to all ESP label font sizes (0.5–3.0).</summary>
+        [JsonPropertyName("espTextScale")]
+        public float EspTextScale { get; set; } = 1.0f;
+
+        /// <summary>Draw a stroke outline around all ESP text instead of a drop shadow. Improves legibility on chroma-keyed overlays.</summary>
+        [JsonPropertyName("espTextOutline")]
+        public bool EspTextOutline { get; set; } = true;
+
+        /// <summary>Stroke width of the text outline in pixels (0.5–6).</summary>
+        [JsonPropertyName("espTextOutlineWidth")]
+        public float EspTextOutlineWidth { get; set; } = 2.5f;
+
         /// <summary>Show the status text banner at the top-center of the ESP window.</summary>
         public bool EspShowStatusText { get; set; } = true;
 
@@ -447,6 +483,42 @@ namespace eft_dma_radar.Silk.Config
 
         /// <summary>Maximum distance (meters) for ESP player rendering.</summary>
         public float EspPlayerDistance { get; set; } = 500f;
+
+        /// <summary>Show bounding boxes for corpses on the ESP window.</summary>
+        public bool EspShowCorpses { get; set; } = false;
+
+        /// <summary>Maximum distance (meters) for ESP corpse box rendering.</summary>
+        public float EspCorpseDistance { get; set; } = 100f;
+
+        /// <summary>Corpse bounding box and label color (ARGB).</summary>
+        public uint EspCorpseBoxColor { get; set; } = 0xFFA0A0A0;
+
+        /// <summary>Show bounding boxes for dropped backpacks on the ESP window.</summary>
+        public bool EspShowBackpacks { get; set; } = false;
+
+        /// <summary>Maximum distance (meters) for ESP backpack box rendering.</summary>
+        public float EspBackpackDistance { get; set; } = 100f;
+
+        /// <summary>Backpack bounding box and label color (ARGB).</summary>
+        public uint EspBackpackBoxColor { get; set; } = 0xFF64B9FF;
+
+        /// <summary>Show static containers (duffle bags, filing cabinets, etc.) on the ESP window.</summary>
+        public bool EspShowContainers { get; set; } = false;
+
+        /// <summary>Maximum distance (meters) for ESP container rendering.</summary>
+        public float EspContainerDistance { get; set; } = 150f;
+
+        /// <summary>How to render searched containers: 0=Show, 1=Dim, 2=Hide.</summary>
+        public int EspSearchedContainerMode { get; set; } = 0;
+
+        /// <summary>How to render looted corpses (TotalValue=0): 0=Show, 1=Dim, 2=Hide.</summary>
+        public int EspLootedCorpseMode { get; set; } = 0;
+
+        /// <summary>Show eligible extract points on the ESP window.</summary>
+        public bool EspShowExfils { get; set; } = false;
+
+        /// <summary>When true, ESP loot only shows wishlisted items (ignores price/visibility filter).</summary>
+        public bool EspLootWishlistOnly { get; set; } = false;
 
         /// <summary>Maximum distance (meters) for ESP loot rendering.</summary>
         public float EspLootDistance { get; set; } = 100f;
@@ -963,11 +1035,19 @@ namespace eft_dma_radar.Silk.Config
             DoorLootProximity = Math.Clamp(DoorLootProximity, 1f, 200f);
 
             EspPlayerDistance = Math.Clamp(EspPlayerDistance, 10f, 2000f);
-            EspLootDistance = Math.Clamp(EspLootDistance, 10f, 500f);
-            EspRenderMode = Math.Clamp(EspRenderMode, 0, 3);
+            EspCorpseDistance   = Math.Clamp(EspCorpseDistance,    10f, 500f);
+            EspBackpackDistance = Math.Clamp(EspBackpackDistance,  10f, 500f);
+            EspContainerDistance     = Math.Clamp(EspContainerDistance,     10f, 500f);
+            EspSearchedContainerMode = Math.Clamp(EspSearchedContainerMode, 0, 2);
+            EspLootedCorpseMode      = Math.Clamp(EspLootedCorpseMode,      0, 2);
+            EspLootDistance    = Math.Clamp(EspLootDistance,    10f, 500f);
+            EspRenderMode    = Math.Clamp(EspRenderMode,    0, 4);
+            EspNameFontIdx   = Math.Clamp(EspNameFontIdx,   0, 3);
             EspCrosshairType = Math.Clamp(EspCrosshairType, 0, 5);
             EspCrosshairScale = Math.Clamp(EspCrosshairScale, 0.5f, 5f);
             EspTargetFps = Math.Clamp(EspTargetFps, 0, 360);
+            EspTextScale = Math.Clamp(EspTextScale, 0.5f, 3.0f);
+            EspTextOutlineWidth = Math.Clamp(EspTextOutlineWidth, 0.5f, 6f);
 
             LootMinPrice = Math.Max(LootMinPrice, 0);
             LootImportantPrice = Math.Max(LootImportantPrice, 0);
